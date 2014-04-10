@@ -1674,4 +1674,4 @@ OfflineProgressControl = L.Control.extend({
   else this.queue = queue;
 })();
 
-},{}]},{},[1])
+},{}]},{},[1]);

@@ -10,7 +10,9 @@
   "author": "Mathieu Briau",
   "license": "GPLv3",
   "devDependencies": {
-    "grunt": "^0.4.4"
+    "grunt": "^0.4.4",
+    "browserify": "^3.40.0",
+    "grunt-browserify": "^2.0.3"
   },
   "dependencies": {
     "queue-async": "^1.0.7",
