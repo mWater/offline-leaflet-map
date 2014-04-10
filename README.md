@@ -1,11 +1,11 @@
 offline-leaflet-map
 ============
 
-Displaying Leaflet maps with the possibility of saving portions of the map and consulting them offline.
-It uses IndexedDB to store the images with a shim to make it work on the browsers not supporting IndexedDb.
+**offline-leaflet-map** makes it possible to save portions of leaflet maps and consult them offline.
+It uses **IndexedDB** to store the images using a shim to make it work on the browsers not supporting IndexedDb.
 
 ##OfflineLayer
-The OfflineLayer inherit and replaces the leaflet TileLayer.
+The OfflineLayer inherits the leaflet TileLayer.
 
 **Initialization:**
 
