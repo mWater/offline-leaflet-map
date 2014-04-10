@@ -13,8 +13,8 @@ OfflineLayer = L.TileLayer.extend({
         this._hasBeenCanceled = false;
         this._nbTilesLeftToSave = 0;
         this._nbTilesWithError = 0;
-        this._maxNbCachedZoomLevels = 10;
 
+        // Create the DB store and then call the this._onReady callback
         this._tileImagesStore = new IDBStore({
             dbVersion: 1,
             storeName: storeName,
@@ -43,15 +43,18 @@ OfflineLayer = L.TileLayer.extend({
         var self = this;
         var onSuccess = function(dbEntry){
             if(dbEntry){
+                // if the tile has been cached, use the stored Base64 value
                 self._setUpTile(tile, key, dbEntry.image);
             }
             else{
+                // query the map provider for the tile
                 self._setUpTile(tile, key, self.getTileUrl(tilePoint));
             }
         }
 
         var onError = function() {
             // Error while getting the key from the DB
+            // will get the tile from the map provider
             self._setUpTile(tile, key, this.getTileUrl(tilePoint));
             if(self._onError){
                 self._onError();
@@ -59,20 +62,24 @@ OfflineLayer = L.TileLayer.extend({
         }
 
         var key = this._createTileKey(tilePoint.x, tilePoint.y, tilePoint.z);
+        // Look for the tile in the DB
         this._tileImagesStore.get(key, onSuccess, onError);
     },
 
+    // called when the total number of tiles is known
     _updateTotalNbImagesLeftToSave: function(nbTiles){
         this._nbTilesLeftToSave = nbTiles;
         this.fire('tilecachingprogressstart', {nbTiles: this._nbTilesLeftToSave});
     },
 
+    // called each time a tile as been handled
     _decrementNbTilesLeftToSave: function(){
         this._nbTilesLeftToSave--;
         this.fire('tilecachingprogress', {nbTiles:this._nbTilesLeftToSave});
     },
 
     _incrementNbTilesWithError: function(){
+        //Not used for now...
         this._nbTilesWithError++;
     },
 
@@ -101,17 +108,15 @@ OfflineLayer = L.TileLayer.extend({
         return this._myQueue || this._hasBeenCanceled;
     },
 
+    // Returns the tiles currently displayed
+    // this._tiles could return tiles that are currently loaded but not displayed
+    // that is why the tiles are recalculated here.
     _getTileImages: function(){
         var tileImagesToQuery = {};
 
         var map = this._map;
         var startingZoom = map.getZoom();
         var maxZoom = map.getMaxZoom();
-
-        var nbZoomLevelsToCache = maxZoom - startingZoom;
-        if(nbZoomLevelsToCache > this._maxNbCachedZoomLevels){
-            alert("Not possible to save more than " + this._maxNbCachedZoomLevels + " zoom levels.")
-        }
 
         var bounds = map.getPixelBounds();
         var tileSize = this._getTileSize();
@@ -141,6 +146,7 @@ OfflineLayer = L.TileLayer.extend({
         return tileImagesToQuery;
     },
 
+    // saves the tiles currently on screen + lower and higher zoom levels.
     saveTiles: function(){
         if(this.isBusy()){
             alert("system is busy.");
@@ -157,26 +163,28 @@ OfflineLayer = L.TileLayer.extend({
         }
 
         var self = this;
+        // Query all the needed tiles from the DB
         this._tileImagesStore.getBatch(tileImagesToQueryArray, function(items){
+            // will be loading and saving a maximum of 8 tiles at a time
             self._myQueue = queue(8);
             var i = 0;
             self.fire('tilecachingstart', null);
 
             self._nbTilesLeftToSave = 0;
             items.forEach(function (item){
-                if(item){
-                    // image already exist
-                }
-                else{
+                if(!item){
+                    // that tile image is not present in the DB
                     var key = tileImagesToQueryArray[i];
                     var tileInfo = tileImagesToQuery[key];
 
                     self._nbTilesLeftToSave++;
 
+                    // that call will load the image from the map provider
                     var makingAjaxCall = function(url, callback, error, queueCallback){
                         self._ajax(url, callback, error, queueCallback);
                     }
 
+                    // when the image is received, it is stored inside the DB using Base64 format
                     var gettingImage = function (response) {
                         self._tileImagesStore.put(key, {"image": self._arrayBufferToBase64ImagePNG(response)});
                         self._decrementNbTilesLeftToSave();
@@ -190,6 +198,7 @@ OfflineLayer = L.TileLayer.extend({
                         }
                     };
 
+                    // using queue-async to limit the number of simultaneous ajax calls
                     self._myQueue.defer(makingAjaxCall, self._createURL(tileInfo.x, tileInfo.y, tileInfo.z),
                                         gettingImage, errorGettingImage);
                 }
@@ -199,12 +208,13 @@ OfflineLayer = L.TileLayer.extend({
 
             self._updateTotalNbImagesLeftToSave(self._nbTilesLeftToSave);
 
+            // wait for all tiles to be saved or found in the DB
             self._myQueue.awaitAll(function(error, data) {
                 self._hasBeenCanceled = false;
                 self._myQueue = null;
                 self.fire('tilecachingprogressdone', null);
             });
-        }, this._onBatchQueryError, 'dense');
+        }, this._onBatchQueryError, 'dense' /* using dense returns undefined for each entry not present in the DB */);
     },
 
     _getZoomedInTiles: function(x, y, currentZ, maxZ, tileImagesToQuery){
@@ -222,6 +232,7 @@ OfflineLayer = L.TileLayer.extend({
     _getZoomedOutTiles: function(x, y, currentZ, finalZ, tileImagesToQuery){
         this._getTileImage(x, y, currentZ, tileImagesToQuery);
         if(currentZ > finalZ){
+            // getting the zoomed out tile containing this tile
             this._getZoomedOutTiles(Math.floor(x / 2), Math.floor(y / 2), currentZ - 1, finalZ, tileImagesToQuery);
         }
     },
@@ -253,7 +264,7 @@ OfflineLayer = L.TileLayer.extend({
             }, this.options));
     },
 
-    // TAKEN FROM OfflineMap
+    // TAKEN FROM https://github.com/tbicr/OfflineMap
     /*
      Probably btoa can work incorrect, you can override btoa with next example:
      https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Solution_.232_.E2.80.93_rewriting_atob%28%29_and_btoa%28%29_using_TypedArrays_and_UTF-8
@@ -271,7 +282,7 @@ OfflineLayer = L.TileLayer.extend({
         return x + ", " + y + ", " + z;
     },
 
-    // TAKEN FROM OfflineMap
+    // TAKEN FROM https://github.com/tbicr/OfflineMap
     _ajax: function(url, callback, error, queueCallback) {
         if(this._hasBeenCanceled){
             queueCallback();
