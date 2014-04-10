@@ -2,7 +2,7 @@
   "name": "offline-leaflet-map",
   "version": "0.1.0",
   "description": "A Leaflet TileLayer with offline capabilities.",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
