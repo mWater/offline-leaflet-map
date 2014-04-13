@@ -123,26 +123,37 @@ OfflineLayer = L.TileLayer.extend({
         var bounds = map.getPixelBounds();
         var tileSize = this._getTileSize();
 
-        var tileBounds = L.bounds(
+        // bounds are rounded down since a tile cover all the pixels from it's rounded down value until the next tile
+        var roundedTileBounds = L.bounds(
             bounds.min.divideBy(tileSize)._floor(),
             bounds.max.divideBy(tileSize)._floor());
 
         var tilesInScreen = [];
         var j, i;
 
-        for (j = tileBounds.min.y; j <= tileBounds.max.y; j++) {
-            for (i = tileBounds.min.x; i <= tileBounds.max.x; i++) {
+        for (j = roundedTileBounds.min.y; j <= roundedTileBounds.max.y; j++) {
+            for (i = roundedTileBounds.min.x; i <= roundedTileBounds.max.x; i++) {
                 tilesInScreen.push(new L.Point(i, j));
             }
         }
+
+        // We will use the exact bound values to test if sub tiles are still inside these bounds.
+        // The idea is to avoid caching images outside the screen.
+        var tileBounds = L.bounds(
+            bounds.min.divideBy(tileSize),
+            bounds.max.divideBy(tileSize));
+        var minY = tileBounds.min.y;
+        var maxY = tileBounds.max.y;
+        var minX = tileBounds.min.x;
+        var maxX = tileBounds.max.x;
 
         var arrayLength = tilesInScreen.length;
         for (var i = 0; i < arrayLength; i++){
             var point = tilesInScreen[i];
             var x = point.x;
             var y = point.y;
-            this._getZoomedInTiles(x, y, startingZoom, maxZoom, tileImagesToQuery);
-            this._getZoomedOutTiles(Math.floor(x/2), Math.floor(y/2), startingZoom - 1, 0, tileImagesToQuery);
+            this._getZoomedInTiles(x, y, startingZoom, maxZoom, tileImagesToQuery, minY, maxY, minX, maxX);
+            this._getZoomedOutTiles(x, y, startingZoom, 0, tileImagesToQuery, minY, maxY, minX, maxX);
         }
 
         return tileImagesToQuery;
@@ -224,27 +235,42 @@ OfflineLayer = L.TileLayer.extend({
         }, this._onBatchQueryError, 'dense' /* using dense returns undefined for each entry not present in the DB */);
     },
 
-    _getZoomedInTiles: function(x, y, currentZ, maxZ, tileImagesToQuery){
-        this._getTileImage(x, y, currentZ, tileImagesToQuery);
+    _getZoomedInTiles: function(x, y, currentZ, maxZ, tileImagesToQuery, minY, maxY, minX, maxX){
+        this._getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, true);
 
         if(currentZ < maxZ){
             // getting the 4 tile under the current tile
-            this._getZoomedInTiles(x * 2, y * 2, currentZ + 1, maxZ, tileImagesToQuery);
-            this._getZoomedInTiles(x * 2 + 1, y * 2, currentZ + 1, maxZ, tileImagesToQuery);
-            this._getZoomedInTiles(x * 2, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery);
-            this._getZoomedInTiles(x * 2 + 1, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery);
+            minY *= 2;
+            maxY *= 2;
+            minX *= 2;
+            maxX *= 2;
+            this._getZoomedInTiles(x * 2, y * 2, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
+            this._getZoomedInTiles(x * 2 + 1, y * 2, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
+            this._getZoomedInTiles(x * 2, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
+            this._getZoomedInTiles(x * 2 + 1, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
         }
     },
 
-    _getZoomedOutTiles: function(x, y, currentZ, finalZ, tileImagesToQuery){
-        this._getTileImage(x, y, currentZ, tileImagesToQuery);
+    _getZoomedOutTiles: function(x, y, currentZ, finalZ, tileImagesToQuery, minY, maxY, minX, maxX){
+        this._getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, false);
+
         if(currentZ > finalZ){
+            minY /= 2;
+            maxY /= 2;
+            minX /= 2;
+            maxX /= 2;
             // getting the zoomed out tile containing this tile
-            this._getZoomedOutTiles(Math.floor(x / 2), Math.floor(y / 2), currentZ - 1, finalZ, tileImagesToQuery);
+            this._getZoomedOutTiles(Math.floor(x / 2), Math.floor(y / 2), currentZ - 1, finalZ, tileImagesToQuery,
+                                    minY, maxY, minX, maxX);
         }
     },
 
-    _getTileImage: function(x, y, z, tileImagesToQuery){
+    _getTileImage: function(x, y, z, tileImagesToQuery, minY, maxY, minX, maxX){
+        // is the tile outside the bounds?
+        if(x < Math.floor(minX) || x > Math.floor(maxX) || y < Math.floor(minY) || y > Math.floor(maxY)){
+            return;
+        }
+
         // At this point, we only add the image to a "dictionary"
         // This is being done to avoid multiple requests when zooming out, since zooming int should never overlap
         var key = this._createTileKey(x, y, z);
@@ -297,6 +323,14 @@ OfflineProgressControl = L.Control.extend({
         L.DomEvent.addListener(cancelButton, 'click', this.onCancelClick, this);
         L.DomEvent.disableClickPropagation(cancelButton);
 
+        var clearButton = L.DomUtil.create('input', 'offlinemap-controls-clear-button', controls);
+        clearButton.setAttribute('type', "button");
+        clearButton.setAttribute('id', "clearBtn");
+        clearButton.setAttribute('value', "Clear");
+
+        L.DomEvent.addListener(clearButton, 'click', this.onClearClick, this);
+        L.DomEvent.disableClickPropagation(clearButton);
+
         return controls;
     },
 
@@ -333,6 +367,10 @@ OfflineProgressControl = L.Control.extend({
         if(this._offlineLayer.cancel()){
             this._counter.innerHTML = "Canceling...";
         };
+    },
+
+    onClearClick: function (){
+        this._offlineLayer.clearTiles();
     },
 
     setOfflineLayer: function (offlineLayer){
@@ -399,10 +437,7 @@ function arrayBufferToBase64ImagePNG(buffer) {
     }
     return 'data:image/png;base64,' + btoa(binary);
 }
-},{"idb-wrapper":3,"queue-async":4}],2:[function(require,module,exports){
-
-
-},{}],3:[function(require,module,exports){
+},{"idb-wrapper":2,"queue-async":3}],2:[function(require,module,exports){
 /*global window:false, self:false, define:false, module:false */
 
 /**
@@ -1622,7 +1657,7 @@ function arrayBufferToBase64ImagePNG(buffer) {
 
 }, this);
 
-},{}],4:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 (function() {
   var slice = [].slice;
 
@@ -1704,4 +1739,4 @@ function arrayBufferToBase64ImagePNG(buffer) {
   else this.queue = queue;
 })();
 
-},{}]},{},[1,2]);
+},{}]},{},[1]);
