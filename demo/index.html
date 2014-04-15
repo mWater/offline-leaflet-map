@@ -36,7 +36,19 @@
                 L.DomEvent.addListener(cacheButton, 'click', this.onCacheClick, this);
                 L.DomEvent.disableClickPropagation(cacheButton);
 
+                var clearButton = L.DomUtil.create('input', 'offlinemap-controls-clear-button', controls);
+                clearButton.setAttribute('type', "button");
+                clearButton.setAttribute('id', "clearBtn");
+                clearButton.setAttribute('value', "Clear DB");
+
+                L.DomEvent.addListener(clearButton, 'click', this.onClearClick, this);
+                L.DomEvent.disableClickPropagation(clearButton);
+
                 return controls;
+            },
+
+            onClearClick: function (){
+                offlineLayer.clearTiles();
             },
 
             onCacheClick: function (){

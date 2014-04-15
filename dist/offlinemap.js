@@ -323,14 +323,6 @@ OfflineProgressControl = L.Control.extend({
         L.DomEvent.addListener(cancelButton, 'click', this.onCancelClick, this);
         L.DomEvent.disableClickPropagation(cancelButton);
 
-        var clearButton = L.DomUtil.create('input', 'offlinemap-controls-clear-button', controls);
-        clearButton.setAttribute('type', "button");
-        clearButton.setAttribute('id', "clearBtn");
-        clearButton.setAttribute('value', "Clear");
-
-        L.DomEvent.addListener(clearButton, 'click', this.onClearClick, this);
-        L.DomEvent.disableClickPropagation(clearButton);
-
         return controls;
     },
 
@@ -367,10 +359,6 @@ OfflineProgressControl = L.Control.extend({
         if(this._offlineLayer.cancel()){
             this._counter.innerHTML = "Canceling...";
         };
-    },
-
-    onClearClick: function (){
-        this._offlineLayer.clearTiles();
     },
 
     setOfflineLayer: function (offlineLayer){
