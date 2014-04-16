@@ -285,20 +285,35 @@ OfflineLayer = L.TileLayer.extend({
         }
     },
 
+    _createNormalizedTilePoint: function(x, y, z){
+        var nbTilesAtZoomLevel = Math.pow(2, z);
+
+        while(x > nbTilesAtZoomLevel){
+            x -= nbTilesAtZoomLevel;
+        }
+        while(x < 0){
+            x += nbTilesAtZoomLevel;
+        }
+
+        while(y > nbTilesAtZoomLevel){
+            y -= nbTilesAtZoomLevel;
+        }
+        while(y < 0){
+            y += nbTilesAtZoomLevel;
+        }
+        return {x: x, y: y, z: z};
+    },
+
     _createURL: function(x, y, z){
-        var subdomainIndex = Math.abs(x + y) % this.options.subdomains.length;
-        var subdomain = this.options.subdomains[subdomainIndex];
-        return L.Util.template(this._url,
-            L.extend({
-                s: subdomain,
-                z: z,
-                x: x,
-                y: y
-            }, this.options));
+        var tilePoint = this._createNormalizedTilePoint(x, y, z);
+
+        return this.getTileUrl(tilePoint);
     },
 
     _createTileKey: function(x, y, z){
-        return x + ", " + y + ", " + z;
+        var tilePoint = this._createNormalizedTilePoint(x, y, z);
+
+        return tilePoint.x + ", " + tilePoint.y + ", " + tilePoint.z;
     }
 });
 module.exports.OfflineLayer = OfflineLayer;
