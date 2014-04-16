@@ -288,7 +288,7 @@ OfflineLayer = L.TileLayer.extend({
     _createURL: function(x, y, z){
         var subdomainIndex = Math.abs(x + y) % this.options.subdomains.length;
         var subdomain = this.options.subdomains[subdomainIndex];
-        return L.Util.template(mapquestUrl,
+        return L.Util.template(this._url,
             L.extend({
                 s: subdomain,
                 z: z,
@@ -301,6 +301,7 @@ OfflineLayer = L.TileLayer.extend({
         return x + ", " + y + ", " + z;
     }
 });
+module.exports.OfflineLayer = OfflineLayer;
 
 OfflineProgressControl = L.Control.extend({
     options: {
@@ -370,6 +371,7 @@ OfflineProgressControl = L.Control.extend({
 
     }
 });
+module.exports.OfflineProgressControl = OfflineProgressControl;
 
 // The following code was taken from https://github.com/tbicr/OfflineMap
 // under the MIT License (MIT)
@@ -425,6 +427,7 @@ function arrayBufferToBase64ImagePNG(buffer) {
     }
     return 'data:image/png;base64,' + btoa(binary);
 }
+
 },{"idb-wrapper":2,"queue-async":3}],2:[function(require,module,exports){
 /*global window:false, self:false, define:false, module:false */
 
