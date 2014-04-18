@@ -32,6 +32,12 @@ OfflineLayer = L.TileLayer.extend({
         });
     },
 
+    _reportError: function(errorType, errorData1, errorData2) {
+        if(this._onError){
+            this._onError(errorType, errorData1, errorData2);
+        }
+    },
+
     _loadTile: function (tile, tilePoint) {
         // Reproducing TileLayer._loadTile behavior, but the tile.src will be set later
         tile._layer = this;
@@ -56,9 +62,7 @@ OfflineLayer = L.TileLayer.extend({
             // Error while getting the key from the DB
             // will get the tile from the map provider
             self._setUpTile(tile, key, this.getTileUrl(tilePoint));
-            if(self._onError){
-                self._onError();
-            }
+            self._reportError("INDEXED_DB_GET", key);
         }
 
         var key = this._createTileKey(tilePoint.x, tilePoint.y, tilePoint.z);
@@ -202,22 +206,22 @@ OfflineLayer = L.TileLayer.extend({
                         ajax(url, callback, error, queueCallback);
                     }
 
+                    var imageUrl = self._createURL(tileInfo.x, tileInfo.y, tileInfo.z);
+
                     // when the image is received, it is stored inside the DB using Base64 format
                     var gettingImage = function (response) {
                         self._tileImagesStore.put(key, {"image": arrayBufferToBase64ImagePNG(response)});
                         self._decrementNbTilesLeftToSave();
                     }
 
-                    var errorGettingImage = function (){
+                    var errorGettingImage = function (errorType, errorData){
                         self._incrementNbTilesWithError();
                         self._decrementNbTilesLeftToSave();
-                        if(this._onError){
-                            this._onError();
-                        }
+                        self._reportError(errorType, errorData, imageUrl);
                     };
 
                     // using queue-async to limit the number of simultaneous ajax calls
-                    self._myQueue.defer(makingAjaxCall, self._createURL(tileInfo.x, tileInfo.y, tileInfo.z),
+                    self._myQueue.defer(makingAjaxCall, imageUrl,
                                         gettingImage, errorGettingImage);
                 }
 
@@ -279,10 +283,8 @@ OfflineLayer = L.TileLayer.extend({
         }
     },
 
-    _onBatchQueryError: function(){
-        if(this._onError){
-            this._onError();
-        }
+    _onBatchQueryError: function(errorData){
+        this._reportError("INDEXED_DB_BATCH", errorData);
     },
 
     _createNormalizedTilePoint: function(x, y, z){
@@ -423,9 +425,13 @@ function ajax(url, callback, error, queueCallback) {
             callback(this.response);
         }
         else{
-            error();
+            error("GET_STATUS_ERROR", err);
         }
         queueCallback();
+    };
+    xhr.onerror = function(errorMsg) {
+      error("NETWORK_ERROR", errorMsg);
+      queueCallback();
     };
     xhr.send();
 }

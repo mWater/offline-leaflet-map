@@ -13,7 +13,7 @@ It is initialized the same way, using url and options but it has 3 extra options
 
 * **onReady:** All IndexedDb operations are asynch, onReady will be called when the DB is ready and tile images can be
      retrieved.
-* onError(optional): Will be called if anything goes wrong.
+* onError(optional): Will be called if anything goes wrong with (errorType, errorData), more details in Errors section.
 * storeName(optional): If you ever need to change the default storeName: "OfflineLeafletTileImages".
 
 **Methods:**
@@ -46,6 +46,19 @@ OfflineLayer fires the following events while saving tiles:
 * **'tilecachingprogressstart':** at this point, the total number of images that still need to be saved is known.
 * **'tilecachingprogress':** fired after each image is saved.
 * **'tilecachingprogressdone':** fired when all images have been saved and the OfflineLayer is ready to save more.
+
+**Error types:**
+
+When calling the onError callback, the parameters are (errorType, errorData1, errorData2)
+
+* **"INDEXED\_DB\_BATCH":** An error occurred when calling getBatch on IndexedDB
+* **"INDEXED\_DB\_GET":** An error occurred when calling get on IndexedDB. ErrorData1 is the DB key of the tile.
+* **"GET\_STATUS\_ERROR":** The XMLHttpRequest Get status is not equal to 200. ErrorData1 is the error from XMLHttpRequest.
+ErrorData2 is the URL of the image.
+* **"NETWORK\_ERROR":** The XMLHttpRequest used to get an image threw an error. ErrorData1 is the error from XMLHttpRequest.
+ErrorData2 is the URL of the image.
+
+
 
 ##Example
 
