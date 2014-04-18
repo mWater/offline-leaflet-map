@@ -36,6 +36,14 @@
                 L.DomEvent.addListener(cacheButton, 'click', this.onCacheClick, this);
                 L.DomEvent.disableClickPropagation(cacheButton);
 
+                var cacheTo17Button = L.DomUtil.create('input', 'cache-up-to-button', controls);
+                cacheTo17Button.setAttribute('type', "button");
+                cacheTo17Button.setAttribute('id', "Btn1");
+                cacheTo17Button.setAttribute('value', "Cache up to 17");
+
+                L.DomEvent.addListener(cacheTo17Button, 'click', this.onCacheUpToClick, this);
+                L.DomEvent.disableClickPropagation(cacheTo17Button);
+
                 var clearButton = L.DomUtil.create('input', 'offlinemap-controls-clear-button', controls);
                 clearButton.setAttribute('type', "button");
                 clearButton.setAttribute('id', "clearBtn");
@@ -58,7 +66,21 @@
                 if(nbTiles < 10000){
                     console.log("Will be saving: " + nbTiles + " tiles");
                     // the actual call to save the tiles
-                    offlineLayer.saveTiles();
+                    //offlineLayer.saveTiles();
+                    offlineLayer.saveTiles(17);
+                }
+                else{
+                    alert("You are trying to save " + nbTiles + " tiles. There is currently a limit of 10,000 tiles.");
+                }
+            },
+
+            onCacheUpToClick : function (){
+                var nbTiles = offlineLayer.calculateNbTiles(17);
+                if(nbTiles < 10000){
+                    console.log("Will be saving: " + nbTiles + " tiles");
+                    // the actual call to save the tiles
+                    //offlineLayer.saveTiles();
+                    offlineLayer.saveTiles(17);
                 }
                 else{
                     alert("You are trying to save " + nbTiles + " tiles. There is currently a limit of 10,000 tiles.");

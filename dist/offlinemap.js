@@ -97,9 +97,9 @@ OfflineLayer = L.TileLayer.extend({
     },
 
     // calculateNbTiles includes potentially already saved tiles.
-    calculateNbTiles: function(){
+    calculateNbTiles: function(zoomLevelLimit){
         var count = 0;
-        var tileImagesToQuery = this._getTileImages();
+        var tileImagesToQuery = this._getTileImages(zoomLevelLimit);
         for(var key in tileImagesToQuery){
             count++;
         }
@@ -113,13 +113,13 @@ OfflineLayer = L.TileLayer.extend({
     // Returns the tiles currently displayed
     // this._tiles could return tiles that are currently loaded but not displayed
     // that is why the tiles are recalculated here.
-    _getTileImages: function(){
+    _getTileImages: function(zoomLevelLimit){
+        zoomLevelLimit = zoomLevelLimit || this._map.getMaxZoom();
+
         var tileImagesToQuery = {};
 
         var map = this._map;
         var startingZoom = map.getZoom();
-        var maxZoom = map.getMaxZoom();
-
         var bounds = map.getPixelBounds();
         var tileSize = this._getTileSize();
 
@@ -152,7 +152,7 @@ OfflineLayer = L.TileLayer.extend({
             var point = tilesInScreen[i];
             var x = point.x;
             var y = point.y;
-            this._getZoomedInTiles(x, y, startingZoom, maxZoom, tileImagesToQuery, minY, maxY, minX, maxX);
+            this._getZoomedInTiles(x, y, startingZoom, zoomLevelLimit, tileImagesToQuery, minY, maxY, minX, maxX);
             this._getZoomedOutTiles(x, y, startingZoom, 0, tileImagesToQuery, minY, maxY, minX, maxX);
         }
 
@@ -160,7 +160,7 @@ OfflineLayer = L.TileLayer.extend({
     },
 
     // saves the tiles currently on screen + lower and higher zoom levels.
-    saveTiles: function(){
+    saveTiles: function(zoomLevelLimit){
         if(this.isBusy()){
             alert("system is busy.");
             return;
@@ -168,7 +168,7 @@ OfflineLayer = L.TileLayer.extend({
 
         this._hasBeenCanceled = false;
 
-        var tileImagesToQuery = this._getTileImages();
+        var tileImagesToQuery = this._getTileImages(zoomLevelLimit);
 
         var tileImagesToQueryArray = [];
         for(var key in tileImagesToQuery){
