@@ -48,8 +48,7 @@ OfflineLayer = L.TileLayer.extend({
     },
 
     _loadTile: function (tile, tilePoint) {
-        //if(this._tileImagesStore == null)
-        {
+        if(!this._tileImagesStore){
             return L.TileLayer.prototype._loadTile.call(this, tile, tilePoint);
         }
 
@@ -111,7 +110,7 @@ OfflineLayer = L.TileLayer.extend({
     },
 
     clearTiles: function(){
-        if(this._tileImagesStore == null){
+        if(!this._tileImagesStore){
             this._reportError("NO_DB", "No DB available");
             return;
         }
@@ -184,7 +183,7 @@ OfflineLayer = L.TileLayer.extend({
 
     // saves the tiles currently on screen + lower and higher zoom levels.
     saveTiles: function(zoomLevelLimit){
-        if(this._tileImagesStore == null){
+        if(!this._tileImagesStore){
             this._reportError("NO_DB", "No DB available");
             return;
         }
