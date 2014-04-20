@@ -99,8 +99,10 @@
             progressControls.setOfflineLayer(offlineLayer);
             aMap.addControl(progressControls);
         }
-        var onError = function(){
-            // do something
+        var onError = function(errorType, errorData1, errorData2){
+            console.log(errorType);
+            console.log(errorData1);
+            console.log(errorData2);
         }
         var offlineLayer = new OfflineLayer( mapquestUrl, { /*leaflet TileLayer basic options: */ maxZoom: 18,
                                              attribution: mapquestAttrib, subdomains: subDomains,

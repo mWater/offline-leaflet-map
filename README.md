@@ -47,9 +47,20 @@ OfflineLayer fires the following events while saving tiles:
 * **'tilecachingprogress':** fired after each image is saved.
 * **'tilecachingprogressdone':** fired when all images have been saved and the OfflineLayer is ready to save more.
 
-**Error types:**
+##Error callback:
 
 When calling the onError callback, the parameters are (errorType, errorData1, errorData2)
+
+**new OfflineLayer errors:**
+
+* **"COULD\_NOT\_CREATE\_DB":** An error has been thrown when creating the DB (calling new IDBStore internally).
+ErrorData1 is the error thrown by the IDBStore.
+* **"NO\_DB":** Calling clearTiles() or saveTiles() will doing nothing but call the error callback if there is no DB.
+This could happen if these functions are called before the onReady callback or if the DB could not be initialized
+(previous error).
+
+
+**saveTiles() errors:**
 
 * **"INDEXED\_DB\_BATCH":** An error occurred when calling getBatch on IndexedDB
 * **"INDEXED\_DB\_GET":** An error occurred when calling get on IndexedDB. ErrorData1 is the DB key of the tile.
@@ -57,6 +68,7 @@ When calling the onError callback, the parameters are (errorType, errorData1, er
 ErrorData2 is the URL of the image.
 * **"NETWORK\_ERROR":** The XMLHttpRequest used to get an image threw an error. ErrorData1 is the error from XMLHttpRequest.
 ErrorData2 is the URL of the image.
+
 
 
 
