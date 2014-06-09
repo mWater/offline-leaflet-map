@@ -12,7 +12,16 @@
   "devDependencies": {
     "grunt": "^0.4.4",
     "browserify": "^3.40.0",
-    "grunt-browserify": "^2.0.3"
+    "grunt-browserify": "^2.0.3",
+    "gulp": "^3.7.0",
+    "coffee-script": "^1.7.1",
+    "gulp-coffee": "^2.0.1",
+    "gulp-util": "^2.2.16",
+    "testem": "^0.6.16",
+    "coffeeify": "^0.6.0",
+    "glob": "^4.0.2",
+    "chai": "^1.9.1",
+    "vinyl-source-stream": "^0.1.1"
   },
   "dependencies": {
     "queue-async": "^1.0.7",
