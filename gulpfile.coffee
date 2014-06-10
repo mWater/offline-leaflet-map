@@ -2,7 +2,6 @@ gulp = require 'gulp'
 coffee = require('gulp-coffee')
 gutil = require('gulp-util')
 browserify = require('browserify')
-coffeeify = require('coffeeify')
 glob = require('glob')
 streamConvert = require('vinyl-source-stream')
 
@@ -22,7 +21,9 @@ gulp.task('prepareTests', [], () ->
 )
 
 gulp.task('browserify', () ->
-  bundler = browserify("./lib/demo.js")
+  bundler = browserify("./demo.coffee",
+    extensions: [".coffee"]
+    basedir: "./src/")
   bundler.bundle()
     .pipe(streamConvert('bundle.js'))
     .pipe(gulp.dest("./demo/"))
