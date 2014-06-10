@@ -12,7 +12,7 @@ gulp.task('coffee', () ->
   .pipe(gulp.dest('./lib/'))
 )
 
-gulp.task('prepareTests', ['default'], () ->
+gulp.task('prepareTests', [], () ->
   bundler = browserify({entries: glob.sync("./test/*Tests.coffee"), extensions: [".coffee"] })
   bundler.transform(coffeeify)
   stream = bundler.bundle()
@@ -21,5 +21,12 @@ gulp.task('prepareTests', ['default'], () ->
   return stream
 )
 
-gulp.task 'build', ['coffee']
+gulp.task('browserify', () ->
+  bundler = browserify("./lib/demo.js")
+  bundler.bundle()
+    .pipe(streamConvert('bundle.js'))
+    .pipe(gulp.dest("./demo/"))
+)
+
+gulp.task 'build', ['coffee', 'browserify']
 gulp.task 'default', ['build']

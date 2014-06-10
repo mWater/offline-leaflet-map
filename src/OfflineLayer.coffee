@@ -1,7 +1,7 @@
-queue = require('queue-async');
-IDBStore = require('idb-wrapper');
+queue = require 'queue-async'
+IDBStore = require 'idb-wrapper'
 
-class OfflineLayer extends L.TileLayer
+module.exports = class OfflineLayer extends L.TileLayer
   initialize: (url, options) ->
     L.TileLayer.prototype.initialize.call(this, url, options)
 
@@ -53,15 +53,15 @@ class OfflineLayer extends L.TileLayer
     tile.onload = @_tileOnLoad
     # Done reproducing _loadTile
 
-    onSuccess = (dbEntry) ->
+    onSuccess = (dbEntry) =>
       if dbEntry
         # if the tile has been cached, use the stored Base64 value
         @_setUpTile(tile, key, dbEntry.image)
       else
         # query the map provider for the tile
-        @_setUpTile(tile, key, self.getTileUrl(tilePoint))
+        @_setUpTile(tile, key, @getTileUrl(tilePoint))
 
-    onError = () ->
+    onError = () =>
       # Error while getting the key from the DB
       # will get the tile from the map provider
       self._setUpTile(tile, key, @getTileUrl(tilePoint))
@@ -105,7 +105,7 @@ class OfflineLayer extends L.TileLayer
   calculateNbTiles: (zoomLevelLimit) ->
     count = 0
     tileImagesToQuery = @_getTileImages(zoomLevelLimit)
-    for key in tileImagesToQuery
+    for key of tileImagesToQuery
       count++
     return count
 
@@ -173,19 +173,20 @@ class OfflineLayer extends L.TileLayer
     tileImagesToQuery = @_getTileImages(zoomLevelLimit)
 
     tileImagesToQueryArray = []
-    for key in tileImagesToQuery
+
+    for key of tileImagesToQuery
       tileImagesToQueryArray.push(key)
 
     # Query all the needed tiles from the DB
-    @_tileImagesStore.getBatch(tileImagesToQueryArray, (items) =>
+    @_tileImagesStore.getBatch(tileImagesToQueryArray, (tileImages) =>
       # will be loading and saving a maximum of 8 tiles at a time
       @_myQueue = queue(8)
       i = 0
       @fire('tilecachingstart', null)
 
       @_nbTilesLeftToSave = 0
-      items.forEach((item) =>
-        if not item
+      saveTile = (tileImage) =>
+        if not tileImage
           # that tile image is not present in the DB
           key = tileImagesToQueryArray[i]
           tileInfo = tileImagesToQuery[key]
@@ -215,8 +216,9 @@ class OfflineLayer extends L.TileLayer
           # using queue-async to limit the number of simultaneous ajax calls
           @_myQueue.defer(makingAjaxCall, imageUrl, gettingImage, errorGettingImage)
 
-          i++
-      )
+        i++
+
+      saveTile(tileImage) for tileImage in tileImages
 
       @_updateTotalNbImagesLeftToSave(@_nbTilesLeftToSave)
 
@@ -293,3 +295,59 @@ class OfflineLayer extends L.TileLayer
   _createTileKey: (x, y, z) ->
     tilePoint = @_createNormalizedTilePoint(x, y, z)
     return tilePoint.x + ", " + tilePoint.y + ", " + tilePoint.z
+
+## The following code was taken from https://github.com/tbicr/OfflineMap
+## under the MIT License (MIT)
+## and converted to CoffeeScript
+###
+ The MIT License (MIT)
+
+ Copyright (c) <year> <copyright holders>
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+###
+
+ajax = (url, callback, error, queueCallback) ->
+  xhr = new XMLHttpRequest()
+  xhr.open('GET', url, true)
+  xhr.responseType = 'arraybuffer';
+  xhr.onload = (err) ->
+    if (this.status == 200)
+      callback(this.response)
+    else
+      error("GET_STATUS_ERROR", err)
+    queueCallback()
+  xhr.onerror = (errorMsg) ->
+    error("NETWORK_ERROR", errorMsg)
+    queueCallback()
+  xhr.send()
+
+
+###
+Probably btoa can work incorrect, you can override btoa with next example:
+  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Solution_.232_.E2.80.93_rewriting_atob%28%29_and_btoa%28%29_using_TypedArrays_and_UTF-8
+###
+arrayBufferToBase64ImagePNG = (buffer) ->
+  binary = ''
+  bytes = new Uint8Array(buffer)
+  for i in [0 ... bytes.byteLength]
+    binary += String.fromCharCode(bytes[i])
+
+  return 'data:image/png;base64,' + btoa(binary)
+
