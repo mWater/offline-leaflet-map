@@ -6,3 +6,4 @@ lib/OfflineLayer.js
 test/browserified.js
 demo/bundle.js
 dist/index.js
+lib/index.js
