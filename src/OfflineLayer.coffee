@@ -12,7 +12,7 @@ module.exports = class OfflineLayer extends L.TileLayer
     try
       # Create the DB store and then call the @_onReady callback
       imageRetriever = new ImageRetriever(this)
-      @_tileImagesStore = new ImageStore(this, imageRetriever)
+      @_tileImagesStore = new ImageStore(this, imageRetriever, true)
       @_tileImagesStore.createDB(storeName, () =>
         @_onReady()
       )
@@ -163,6 +163,10 @@ module.exports = class OfflineLayer extends L.TileLayer
     #lock UI
     tileImagesToQuery = @_getTileImages(zoomLevelLimit)
     @_tileImagesStore.saveImages(tileImagesToQuery,
+      () =>
+        #unlock cancel
+        null
+      ,
       () =>
         #unlock UI
         null

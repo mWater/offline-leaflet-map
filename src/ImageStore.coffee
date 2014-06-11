@@ -1,5 +1,6 @@
-IDBStore = require 'idb-wrapper'
 async = require 'async'
+IndexedDBDataStorage = require './IndexedDBDataStorage'
+WebSQLDataStorage = require './WebSQLDataStorage'
 
 module.exports = class ImageStore
   constructor: (eventEmitter, imageRetriever) ->
@@ -18,15 +19,10 @@ module.exports = class ImageStore
     if not onReady?
       throw new Error('This async function needs a callback')
 
-    if _useWebSQL
-      @_idbStore = new IDBStore({
-        dbVersion: 1,
-        storeName: storeName,
-        keyPath: null,
-        autoIncrement: false
-      }, onReady)
+    if not _useWebSQL
+      @storage = new IndexedDBDataStorage(storeName, onReady)
     else
-      null
+      @storage = new WebSQLDataStorage(storeName, onReady)
 
   cancel: () ->
     if @_myQueue?
@@ -40,12 +36,12 @@ module.exports = class ImageStore
   get: (key, onSuccess, onError) ->
     if not onSuccess? or not onError?
       throw new Error('This async function needs callbacks')
-    @_idbStore.get(key, onSuccess, onError)
+    @storage.get(key, onSuccess, onError)
 
   clear: (onSuccess, onError) ->
     if not onSuccess? or not onError?
       throw new Error('This async function needs callbacks')
-    @_idbStore.clear(onSuccess, onError)
+    @storage.clear(onSuccess, onError)
 
   saveImages: (tileImagesToQuery, started, onSuccess, onError) ->
     if not started? or not onSuccess? or not onError?
@@ -79,35 +75,37 @@ module.exports = class ImageStore
       tileImagesToQueryArray.push(imageKey)
 
     # Query all the needed tiles from the DB
-    @_idbStore.getBatch(tileImagesToQueryArray, (tileImages) =>
-      i = 0
-      tileInfoOfImagesNotInDB = []
-      @_eventEmitter.fire('tilecachingstart', null)
+    @storage.getDenseBatch(tileImagesToQueryArray,
+      (tileImages) =>
+        i = 0
+        tileInfoOfImagesNotInDB = []
+        @_eventEmitter.fire('tilecachingstart', null)
 
-      @_nbTilesLeftToSave = 0
-      testTile = (tileImage) =>
-        if not tileImage
-          # that tile image is not present in the DB
-          key = tileImagesToQueryArray[i]
-          tileInfo = tileImagesToQuery[key]
+        @_nbTilesLeftToSave = 0
+        testTile = (tileImage) =>
+          if not tileImage
+            # that tile image is not present in the DB
+            key = tileImagesToQueryArray[i]
+            tileInfo = tileImagesToQuery[key]
 
-          @_nbTilesLeftToSave++
-          tileInfoOfImagesNotInDB.push({key: key, tileInfo: tileInfo})
+            @_nbTilesLeftToSave++
+            tileInfoOfImagesNotInDB.push({key: key, tileInfo: tileInfo})
 
-        i++
+          i++
 
-      testTile(tileImage) for tileImage in tileImages
-      @_updateTotalNbImagesLeftToSave(@_nbTilesLeftToSave)
+        testTile(tileImage) for tileImage in tileImages
+        @_updateTotalNbImagesLeftToSave(@_nbTilesLeftToSave)
 
-      callback(tileInfoOfImagesNotInDB)
-
-    ,@_onBatchQueryError, 'dense'
+        callback(tileInfoOfImagesNotInDB)
+      ,
+      (error) =>
+        @_onBatchQueryError(error)
     )
 
   _saveTile: (data, callback) ->
     # when the image is received, it is stored inside the DB using Base64 format
     gettingImage = (response) =>
-      @_idbStore.put(data.key, {"image": response},
+      @storage.put(data.key, {"image": response},
       () =>
         @_decrementNbTilesLeftToSave()
         callback()
