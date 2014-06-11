@@ -2,9 +2,9 @@
     "framework": "mocha",
     "serve_files": [ "test/browserified.js" ],
     "src_files": [
-        "src/*.js",
-        "src/*.coffee",
-        "test/*.coffee"
+        "src/**/.js",
+        "src/**/*.coffee",
+        "test/**/*.coffee"
     ],
     "launchers": {
     },

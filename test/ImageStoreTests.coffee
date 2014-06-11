@@ -2,7 +2,106 @@ assert = require("chai").assert
 expect = require("chai").expect
 
 ImageStore = require '../src/ImageStore'
+FakeEventEmitter = require './FakeEventEmitter'
+FakeImageRetriever = require './FakeImageRetriever'
+
+imageStore = null
+
+checkKey = (key, done) ->
+  imageStore.get(key,
+  (image) ->
+    assert.isDefined(image);
+    assert.property(image, 'image')
+    assert.equal(image.image, key)
+    done()
+  ,
+  (error) ->
+    assert.fail()
+  )
 
 describe "ImageStore", ->
-  it "can be constructed with no parameters", ->
-    imageStore = new ImageStore
+
+  beforeEach((done) ->
+    fakeEventEmitter = new FakeEventEmitter()
+    fakeImageRetriever = new FakeImageRetriever()
+    imageStore = new ImageStore(fakeEventEmitter, fakeImageRetriever)
+    clear = () ->
+      imageStore.clear(
+        () ->
+          done()
+        ,
+        () ->
+          assert(false, "Not possible to clean the DB.")
+          done()
+      )
+    imageStore.createDB("test", clear)
+  )
+
+  it "is constructed with an EventEmitter and an ImageRetriever", ->
+    return null
+
+  it "it can save an entry and retrieve it", (done) ->
+    key = "1:2:3"
+    imagesToSave = {}
+    imagesToSave[key] = key
+
+    onSaveSuccess = () =>
+      checkKey(key, done)
+
+    imageStore.saveImages(imagesToSave, onSaveSuccess, () =>
+      assert.fail()
+    )
+
+
+  it "it can clear the entries", (done) ->
+    key = "1:2:3"
+    imagesToSave = {}
+    imagesToSave[key] = key
+
+    onClearSuccess = () =>
+      imageStore.get(key,
+      (image) ->
+        assert.isUndefined(image);
+        done()
+      ,
+      (error) ->
+        assert.fail()
+      )
+
+    onSaveSuccess = () =>
+      imageStore.clear(onClearSuccess, () =>
+        assert.fail()
+      )
+
+
+    imageStore.saveImages(imagesToSave, onSaveSuccess, () =>
+      assert.fail()
+    )
+
+  it "it can save multiple entries and retrieve them", (done) ->
+    imagesToSave = {}
+
+    keyA = "1:2:3"
+    imagesToSave[keyA] = keyA
+
+    keyB = "4:5:6"
+    imagesToSave[keyB] = keyB
+
+    keyC = "7:8:9"
+    imagesToSave[keyC] = keyC
+
+    nbDone = 0
+    doneStep = () =>
+      nbDone++
+      if nbDone == imagesToSave.length
+        done()
+
+    onSaveSuccess = () =>
+      checkKey(keyA, doneStep)
+      checkKey(keyB, doneStep)
+      checkKey(keyC, doneStep)
+
+    imageStore.saveImages(imagesToSave, onSaveSuccess, () =>
+      assert.fail()
+    )
+

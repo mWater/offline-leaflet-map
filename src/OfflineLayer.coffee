@@ -1,4 +1,5 @@
 ImageStore = require './ImageStore'
+ImageRetriever = require './ImageRetriever'
 
 module.exports = class OfflineLayer extends L.TileLayer
   initialize: (url, options) ->
@@ -10,7 +11,8 @@ module.exports = class OfflineLayer extends L.TileLayer
 
     try
       # Create the DB store and then call the @_onReady callback
-      @_tileImagesStore = new ImageStore(this)
+      imageRetriever = new ImageRetriever(this)
+      @_tileImagesStore = new ImageStore(this, imageRetriever)
       @_tileImagesStore.createDB(storeName, () =>
         @_onReady()
       )

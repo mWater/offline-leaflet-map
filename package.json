@@ -26,7 +26,8 @@
     "coffeeify": "^0.6.0",
     "glob": "^4.0.2",
     "chai": "^1.9.1",
-    "vinyl-source-stream": "^0.1.1"
+    "vinyl-source-stream": "^0.1.1",
+    "async": "^0.9.0"
   },
   "dependencies": {
     "queue-async": "^1.0.7",
