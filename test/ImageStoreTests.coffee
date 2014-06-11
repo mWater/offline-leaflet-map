@@ -93,7 +93,7 @@ describe "ImageStore", ->
     nbDone = 0
     doneStep = () =>
       nbDone++
-      if nbDone == imagesToSave.length
+      if nbDone == 3
         done()
 
     onSaveSuccess = () =>

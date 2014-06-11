@@ -50,7 +50,6 @@ module.exports = class ImageStore
 
     # Query all the needed tiles from the DB
     @_idbStore.getBatch(tileImagesToQueryArray, (tileImages) =>
-      console.log 'starting getBatch'
       i = 0
       tileInfoOfImagesNotInDB = []
       @eventEmitter.fire('tilecachingstart', null)
@@ -76,14 +75,12 @@ module.exports = class ImageStore
           @_idbStore.put(data.key, {"image": response},
             () =>
               @_decrementNbTilesLeftToSave()
-              console.log 'put'
               callback()
             ,
             () =>
               #should be reporting the error
               @_incrementNbTilesWithError()
               @_decrementNbTilesLeftToSave()
-              console.log 'error2'
               callback()
           )
 
@@ -92,19 +89,14 @@ module.exports = class ImageStore
           @_incrementNbTilesWithError()
           @_decrementNbTilesLeftToSave()
           @_reportError(errorType, errorData, tileInfo)
-          console.log 'error'
           callback(errorType)
 
         canceled = () =>
-          console.log 'cancel'
           callback()
 
         @_imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage, canceled)
 
-      # will be loading and saving a maximum of 8 tiles at a time
-      console.log 'starting each: ' + tileInfoOfImagesNotInDB
-      async.eachLimit(tileInfoOfImagesNotInDB, 1, saveTile, (error) =>
-        console.log 'done each: ' + error
+      async.eachLimit(tileInfoOfImagesNotInDB, 8, saveTile, (error) =>
         @_hasBeenCanceled = false
         @eventEmitter.fire('tilecachingprogressdone', null)
         if error?
