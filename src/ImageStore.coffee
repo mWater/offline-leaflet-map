@@ -8,41 +8,71 @@ module.exports = class ImageStore
     if not eventEmitter?
       throw new Error('the image store needs an eventEmitter')
 
-    @eventEmitter = eventEmitter
+    @_eventEmitter = eventEmitter
     @_nbTilesLeftToSave = 0
-    @_nbTilesWithError = 0
-    @_hasBeenCanceled = false
     @_imageRetriever = imageRetriever
+    @_myQueue = null
 
-  createDB: (storeName, onReady) ->
-    @_idbStore = new IDBStore({
-      dbVersion: 1,
-      storeName: storeName,
-      keyPath: null,
-      autoIncrement: false
-    }, onReady)
+  createDB: (storeName, onReady, useWebSQL) ->
+    _useWebSQL = useWebSQL
+    if not onReady?
+      throw new Error('This async function needs a callback')
+
+    if _useWebSQL
+      @_idbStore = new IDBStore({
+        dbVersion: 1,
+        storeName: storeName,
+        keyPath: null,
+        autoIncrement: false
+      }, onReady)
+    else
+      null
 
   cancel: () ->
-    if(@_myQueue)
-      @_hasBeenCanceled = true
+    if @_myQueue?
+      @_myQueue.pause()
       return true
-
-    @_imageRetriever.cancel()
     return false
 
   isBusy: () ->
-    return @_myQueue or @_hasBeenCanceled
+    return @_myQueue?
 
   get: (key, onSuccess, onError) ->
+    if not onSuccess? or not onError?
+      throw new Error('This async function needs callbacks')
     @_idbStore.get(key, onSuccess, onError)
 
   clear: (onSuccess, onError) ->
+    if not onSuccess? or not onError?
+      throw new Error('This async function needs callbacks')
     @_idbStore.clear(onSuccess, onError)
 
-  saveImages: (tileImagesToQuery, onSuccess, onError) ->
-    @_hasBeenCanceled = false
-    @_imageRetriever.reset()
+  saveImages: (tileImagesToQuery, started, onSuccess, onError) ->
+    if not started? or not onSuccess? or not onError?
+      throw new Error('This async function needs callbacks')
 
+    @_getImagesNotInDB(tileImagesToQuery, (tileInfoOfImagesNotInDB) =>
+      if tileInfoOfImagesNotInDB? and tileInfoOfImagesNotInDB.length > 0
+        @_myQueue = async.queue((data, callback) =>
+          @_saveTile(data, callback)
+        , 8);
+        @_myQueue.drain = (error) =>
+          @_eventEmitter.fire('tilecachingprogressdone', null)
+          @_myQueue = null
+          if error?
+            onError()
+          else
+            onSuccess()
+
+        @_myQueue.push data for data in tileInfoOfImagesNotInDB
+        started()
+      else
+        #nothing to do
+        started()
+        onSuccess()
+    )
+
+  _getImagesNotInDB: (tileImagesToQuery, callback) ->
     tileImagesToQueryArray = []
 
     for imageKey of tileImagesToQuery
@@ -52,7 +82,7 @@ module.exports = class ImageStore
     @_idbStore.getBatch(tileImagesToQueryArray, (tileImages) =>
       i = 0
       tileInfoOfImagesNotInDB = []
-      @eventEmitter.fire('tilecachingstart', null)
+      @_eventEmitter.fire('tilecachingstart', null)
 
       @_nbTilesLeftToSave = 0
       testTile = (tileImage) =>
@@ -69,56 +99,40 @@ module.exports = class ImageStore
       testTile(tileImage) for tileImage in tileImages
       @_updateTotalNbImagesLeftToSave(@_nbTilesLeftToSave)
 
-      saveTile = (data, callback) =>
-        # when the image is received, it is stored inside the DB using Base64 format
-        gettingImage = (response) =>
-          @_idbStore.put(data.key, {"image": response},
-            () =>
-              @_decrementNbTilesLeftToSave()
-              callback()
-            ,
-            () =>
-              #should be reporting the error
-              @_incrementNbTilesWithError()
-              @_decrementNbTilesLeftToSave()
-              callback()
-          )
+      callback(tileInfoOfImagesNotInDB)
 
-
-        errorGettingImage = (errorType, errorData) =>
-          @_incrementNbTilesWithError()
-          @_decrementNbTilesLeftToSave()
-          @_reportError(errorType, errorData, tileInfo)
-          callback(errorType)
-
-        canceled = () =>
-          callback()
-
-        @_imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage, canceled)
-
-      async.eachLimit(tileInfoOfImagesNotInDB, 8, saveTile, (error) =>
-        @_hasBeenCanceled = false
-        @eventEmitter.fire('tilecachingprogressdone', null)
-        if error?
-          onError()
-        else
-          onSuccess()
-      )
     ,@_onBatchQueryError, 'dense'
     )
+
+  _saveTile: (data, callback) ->
+    # when the image is received, it is stored inside the DB using Base64 format
+    gettingImage = (response) =>
+      @_idbStore.put(data.key, {"image": response},
+      () =>
+        @_decrementNbTilesLeftToSave()
+        callback()
+      ,
+      (error) =>
+        @_decrementNbTilesLeftToSave()
+        callback(error)
+      )
+
+    errorGettingImage = (errorType, errorData) =>
+      @_decrementNbTilesLeftToSave()
+      @_eventEmitter._reportError(errorType, errorData, data.tileInfo)
+      callback(errorType)
+
+    canceled = () =>
+      callback()
+
+    @_imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage, canceled)
 
   # called when the total number of tiles is known
   _updateTotalNbImagesLeftToSave: (nbTiles) ->
     @_nbTilesLeftToSave = nbTiles
-    @eventEmitter.fire('tilecachingprogressstart', {nbTiles: @_nbTilesLeftToSave})
-
+    @_eventEmitter.fire('tilecachingprogressstart', {nbTiles: @_nbTilesLeftToSave})
 
   # called each time a tile as been handled
   _decrementNbTilesLeftToSave: () ->
     @_nbTilesLeftToSave--
-    @eventEmitter.fire('tilecachingprogress', {nbTiles:@_nbTilesLeftToSave})
-
-  _incrementNbTilesWithError: () ->
-    #Not used for now...
-    @_nbTilesWithError++
-
+    @_eventEmitter.fire('tilecachingprogress', {nbTiles:@_nbTilesLeftToSave})

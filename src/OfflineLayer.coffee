@@ -76,7 +76,20 @@ module.exports = class OfflineLayer extends L.TileLayer
       @_reportError("NO_DB", "No DB available")
       return
 
-    @_tileImagesStore.clear()
+    if(@isBusy())
+      alert("system is busy.")
+      return
+
+    #lock UI
+    @_tileImagesStore.clear(
+      () =>
+        #unlock UI
+        null
+      ,
+      (error) =>
+        #unlock UI
+        null
+    )
 
   # calculateNbTiles includes potentially already saved tiles.
   calculateNbTiles: (zoomLevelLimit) ->
@@ -147,9 +160,17 @@ module.exports = class OfflineLayer extends L.TileLayer
       alert("system is busy.")
       return
 
+    #lock UI
     tileImagesToQuery = @_getTileImages(zoomLevelLimit)
-
-    @_tileImagesStore.saveImages(tileImagesToQuery, this)
+    @_tileImagesStore.saveImages(tileImagesToQuery,
+      () =>
+        #unlock UI
+        null
+      ,
+      (error) =>
+        #unlock UI
+        null
+    )
 
   _getZoomedInTiles: (x, y, currentZ, maxZ, tileImagesToQuery, minY, maxY, minX, maxX) ->
     @_getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, true)

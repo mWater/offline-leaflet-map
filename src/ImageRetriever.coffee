@@ -1,21 +1,10 @@
 
 module.exports = class ImageRetriever
   constructor: (offlineLayer) ->
-    @_hasBeenCanceled = false
     @offlineLayer = offlineLayer
 
-  cancel: () ->
-    @_hasBeenCanceled = true
-
-  reset: () ->
-    @_hasBeenCanceled = false
-
-  retrieveImage: (tileInfo, callback, error, canceled) ->
-    imageUrl = @control._createURL(tileInfo.x, tileInfo.y, tileInfo.z)
-
-    if(@_hasBeenCanceled)
-      canceled()
-      return
+  retrieveImage: (tileInfo, callback, error) ->
+    imageUrl = @offlineLayer._createURL(tileInfo.x, tileInfo.y, tileInfo.z)
 
     ajax(imageUrl, (response) ->
       callback(arrayBufferToBase64ImagePNG(response))
@@ -59,10 +48,8 @@ ajax = (url, callback, error, queueCallback) ->
       callback(this.response)
     else
       error("GET_STATUS_ERROR", err)
-    queueCallback()
   xhr.onerror = (errorMsg) ->
     error("NETWORK_ERROR", errorMsg)
-    queueCallback()
   xhr.send()
 
 

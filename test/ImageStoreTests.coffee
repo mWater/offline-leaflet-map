@@ -4,6 +4,7 @@ expect = require("chai").expect
 ImageStore = require '../src/ImageStore'
 FakeEventEmitter = require './FakeEventEmitter'
 FakeImageRetriever = require './FakeImageRetriever'
+BrokenImageRetriever = require './BrokenImageRetriever'
 
 imageStore = null
 
@@ -18,6 +19,9 @@ checkKey = (key, done) ->
   (error) ->
     assert.fail()
   )
+
+doNothing = () ->
+  null
 
 describe "ImageStore", ->
 
@@ -48,12 +52,12 @@ describe "ImageStore", ->
     onSaveSuccess = () =>
       checkKey(key, done)
 
-    imageStore.saveImages(imagesToSave, onSaveSuccess, () =>
+    imageStore.saveImages(imagesToSave, doNothing, onSaveSuccess, () =>
       assert.fail()
     )
 
 
-  it "it can clear the entries", (done) ->
+  it "can clear the entries", (done) ->
     key = "1:2:3"
     imagesToSave = {}
     imagesToSave[key] = key
@@ -74,11 +78,46 @@ describe "ImageStore", ->
       )
 
 
-    imageStore.saveImages(imagesToSave, onSaveSuccess, () =>
+    imageStore.saveImages(imagesToSave, doNothing, onSaveSuccess, () =>
       assert.fail()
     )
 
-  it "it can save multiple entries and retrieve them", (done) ->
+  it.skip "can be canceled", (done) ->
+    # use the BrokenImageRetriever (so nothing is ever retrieved)
+    imageStore._imageRetriever = new BrokenImageRetriever()
+
+    key = "1:2:3"
+    imagesToSave = {}
+    imagesToSave[key] = key
+
+    nbDone = 0
+    doneStep = () =>
+      nbDone++
+      if nbDone == 2
+        done()
+
+    onStarted = () =>
+      console.log imageStore._myQueue.idle()
+      imageStore.cancel()
+      console.log imageStore._myQueue.idle()
+
+    onSaveSuccess = () =>
+      doneStep()
+
+    imageStore.saveImages(imagesToSave, onStarted, onSaveSuccess, () =>
+      assert.fail()
+    )
+
+    imageStore.get(key,
+      (image) ->
+        assert.isUndefined(image);
+        doneStep()
+      ,
+      (error) ->
+        assert.fail()
+    )
+
+  it "can save multiple entries and retrieve them", (done) ->
     imagesToSave = {}
 
     keyA = "1:2:3"
@@ -101,7 +140,7 @@ describe "ImageStore", ->
       checkKey(keyB, doneStep)
       checkKey(keyC, doneStep)
 
-    imageStore.saveImages(imagesToSave, onSaveSuccess, () =>
+    imageStore.saveImages(imagesToSave, doNothing, onSaveSuccess, () =>
       assert.fail()
     )
 

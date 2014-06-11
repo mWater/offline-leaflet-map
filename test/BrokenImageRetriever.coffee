@@ -1,7 +1,7 @@
 
-module.exports = class FakeImageRetriever
+module.exports = class BrokenImageRetriever
   constructor: () ->
     null
 
   retrieveImage: (tileInfo, callback, error) ->
-    callback(tileInfo)
+    setTimeout(callback, 100)
