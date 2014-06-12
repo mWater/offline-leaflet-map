@@ -12,7 +12,6 @@ checkKey = (key, done) ->
   imageStore.get(key,
   (image) ->
     assert.isDefined(image);
-    console.log image
     assert.property(image, 'image')
     assert.equal(image.image, key)
     done()
@@ -98,9 +97,7 @@ describe "ImageStore", ->
           done()
 
       onStarted = () =>
-        console.log imageStore._myQueue.idle()
         imageStore.cancel()
-        console.log imageStore._myQueue.idle()
 
       onSaveSuccess = () =>
         doneStep()

@@ -1,13 +1,13 @@
 assert = require("chai").assert
 expect = require("chai").expect
 
-WebSQLDataStorage = require '../src/WebSQLDataStorage'
+IndexedDBDataStorage = require '../src/IndexedDBDataStorage'
 
 nothing = ->
   null
 
-checkKey = (webSQLDataStorage, key, done) ->
-  webSQLDataStorage.get(key,
+checkKey = (indexedDBDataStorage, key, done) ->
+  indexedDBDataStorage.get(key,
   (image) ->
     assert.isDefined(image);
     assert.property(image, 'image')
@@ -18,30 +18,30 @@ checkKey = (webSQLDataStorage, key, done) ->
     assert.fail()
   )
 
-describe "WebSQLDataStorage", ->
+describe "IndexedDBDataStorage", ->
   it "is constructed with a storeName and a onReady callback", (done) ->
-    new WebSQLDataStorage("test", () ->
+    new IndexedDBDataStorage("test", () ->
       done()
     )
 
   it "can save an entry and retrieve it", (done) ->
     onReady = () =>
-      webSQLDataStorage.clear(() ->
+      indexedDBDataStorage.clear(() ->
         key = "1:2:3"
         data = {image: key}
         onSaveSuccess = () =>
-          checkKey(webSQLDataStorage, key, done)
+          checkKey(indexedDBDataStorage, key, done)
 
-        webSQLDataStorage.put(key, data, onSaveSuccess, () =>
+        indexedDBDataStorage.put(key, data, onSaveSuccess, () =>
           assert.fail()
         )
       )
 
-    webSQLDataStorage = new WebSQLDataStorage("test", onReady)
+    indexedDBDataStorage = new IndexedDBDataStorage("test", onReady)
 
   it "can save 2 entries and retrieve one", (done) ->
     onReady = () =>
-      webSQLDataStorage.clear(() ->
+      indexedDBDataStorage.clear(() ->
         keyA = "a"
         dataA = {image: keyA}
 
@@ -52,29 +52,29 @@ describe "WebSQLDataStorage", ->
         onSaveSuccess = () =>
           nbSaved++
           if nbSaved == 2
-            checkKey(webSQLDataStorage, keyA, done)
+            checkKey(indexedDBDataStorage, keyA, done)
 
-        webSQLDataStorage.put(keyA, dataA, onSaveSuccess, () =>
+        indexedDBDataStorage.put(keyA, dataA, onSaveSuccess, () =>
           assert.fail()
         )
 
-        webSQLDataStorage.put(keyB, dataB, onSaveSuccess, () =>
+        indexedDBDataStorage.put(keyB, dataB, onSaveSuccess, () =>
           assert.fail()
         )
       )
 
-    webSQLDataStorage = new WebSQLDataStorage("test", onReady)
+    indexedDBDataStorage = new IndexedDBDataStorage("test", onReady)
 
   it "can clear all entries", (done) ->
     onReady = () =>
-      webSQLDataStorage.clear(() =>
+      indexedDBDataStorage.clear(() =>
         key = "1:2:3"
         data = {image: key}
         onSaveSuccess = () =>
-          webSQLDataStorage.clear(() =>
-            webSQLDataStorage.get(key,
+          indexedDBDataStorage.clear(() =>
+            indexedDBDataStorage.get(key,
               (image) =>
-                assert.isNull(image)
+                assert.isUndefined(image)
                 done()
               ,
               (error) =>
@@ -82,18 +82,18 @@ describe "WebSQLDataStorage", ->
             )
           )
 
-        webSQLDataStorage.put(key, data, onSaveSuccess, () =>
+        indexedDBDataStorage.put(key, data, onSaveSuccess, () =>
           assert.fail()
         )
       )
 
-    webSQLDataStorage = new WebSQLDataStorage("test", onReady)
+    indexedDBDataStorage = new IndexedDBDataStorage("test", onReady)
 
   # The dense meaning that the response array will have the same length and same ordering as the
   # array of key queried with a null value if the key wasn't matched
   it "can get a dense batch", (done) ->
     onReady = () =>
-      webSQLDataStorage.clear(() =>
+      indexedDBDataStorage.clear(() =>
         keyA = "1:2:3"
         keyB = "4:5:6"
         keyC = "7:8:9"
@@ -106,31 +106,31 @@ describe "WebSQLDataStorage", ->
           nbSaved++
 
           if nbSaved == 3
-            webSQLDataStorage.getDenseBatch(keys,
+            indexedDBDataStorage.getDenseBatch(keys,
               (images) =>
                 console.log(images)
                 assert.equal(images.length, keys.length)
-                assert.equal(images[0], undefined)
+                assert.equal(images[0], undefined )
                 assert.equal(images[1].image, keyA)
-                assert.equal(images[2], undefined)
+                assert.equal(images[2], undefined )
                 assert.equal(images[3].image, keyB)
                 assert.equal(images[4].image, keyC)
-                assert.equal(images[5], undefined)
+                assert.equal(images[5], undefined )
                 done()
               ,
               (error) =>
                 assert.fail()
             )
 
-        webSQLDataStorage.put(keyA, dataA, onSaveSuccess, () =>
+        indexedDBDataStorage.put(keyA, dataA, onSaveSuccess, () =>
           assert.fail()
         )
-        webSQLDataStorage.put(keyB, dataB, onSaveSuccess, () =>
+        indexedDBDataStorage.put(keyB, dataB, onSaveSuccess, () =>
           assert.fail()
         )
-        webSQLDataStorage.put(keyC, dataC, onSaveSuccess, () =>
+        indexedDBDataStorage.put(keyC, dataC, onSaveSuccess, () =>
           assert.fail()
         )
       )
 
-    webSQLDataStorage = new WebSQLDataStorage("test", onReady)
+    indexedDBDataStorage = new IndexedDBDataStorage("test", onReady)

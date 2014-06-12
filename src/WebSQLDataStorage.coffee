@@ -10,7 +10,6 @@ module.exports = class IndexedDBDataStorage
 
   get: (key, onSuccess, onError) ->
     @_webSQLDB.transaction((tx) ->
-      console.log 'key: ' + key
       tx.executeSql("SELECT * FROM #{@_storeName} WHERE id='#{key}'", [], (tx, results) ->
         len = results.rows.length;
         if len == 0
@@ -46,14 +45,13 @@ module.exports = class IndexedDBDataStorage
       tileImagesToQueryArray2 = []
       for i in [0 ... tileImagesToQueryArray.length]
         tileImagesToQueryArray2.push "'" + tileImagesToQueryArray[i] + "'"
-        result.push null
+        result.push undefined
       keys = tileImagesToQueryArray2.join(',')
-      console.log keys
       tx.executeSql("SELECT * FROM #{@_storeName} WHERE id IN (#{keys})", [], (tx, results) ->
         for i in [0 ... results.rows.length]
           item = results.rows.item(i)
           index = tileImagesToQueryArray.indexOf(item.id)
-          result[index] = item.image
+          result[index] = item
         onSuccess(result)
       )
     )
