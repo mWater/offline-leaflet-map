@@ -2,19 +2,20 @@ offline-leaflet-map
 ============
 
 **offline-leaflet-map** makes it possible to save portions of leaflet maps and consult them offline.
-It uses **IndexedDB** to store the images using a shim to make it work on the browsers not supporting IndexedDb.
+It uses either **IndexedDB** by default or Web SQL to store the images if you set the option.
 
 ##OfflineLayer
 The OfflineLayer inherits the leaflet TileLayer.
 
 **Initialization:**
 
-It is initialized the same way, using url and options but it has 3 extra options:
+It is initialized the same way, using url and options but it has extra options:
 
 * **onReady:** All IndexedDb operations are asynch, onReady will be called when the DB is ready and tile images can be
      retrieved.
 * onError(optional): Will be called if anything goes wrong with (errorType, errorData), more details in Errors section.
 * storeName(optional): If you ever need to change the default storeName: "OfflineLeafletTileImages".
+* useWebSQL(optional): Will use WebSQL instead of IndexedDB to store the images.
 
 **Methods:**
 

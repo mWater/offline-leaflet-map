@@ -7,12 +7,13 @@ module.exports = class OfflineLayer extends L.TileLayer
 
     @_onReady = options["onReady"]
     @_onError = options["onError"]
+    @_useWebSQL = options["useWebSQL"]
     storeName = options["storeName"] || 'OfflineLeafletTileImages'
 
     try
       # Create the DB store and then call the @_onReady callback
       imageRetriever = new ImageRetriever(this)
-      @_tileImagesStore = new ImageStore(this, imageRetriever, true)
+      @_tileImagesStore = new ImageStore(this, imageRetriever, @_useWebSQL)
       @_tileImagesStore.createDB(storeName, () =>
         @_onReady()
       )

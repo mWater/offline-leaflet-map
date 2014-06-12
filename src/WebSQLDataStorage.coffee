@@ -14,7 +14,7 @@ module.exports = class IndexedDBDataStorage
       onSQLSuccess = (tx, results) ->
         len = results.rows.length;
         if len == 0
-          onSuccess(null)
+          onSuccess(undefined)
         else if len == 1
           onSuccess(results.rows.item(0))
         else
