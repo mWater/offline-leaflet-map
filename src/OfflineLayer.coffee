@@ -7,20 +7,34 @@ module.exports = class OfflineLayer extends L.TileLayer
 
     @_onReady = options["onReady"]
     @_onError = options["onError"]
-    @_useWebSQL = options["useWebSQL"]
+    dbOption = options["dbOption"]
     storeName = options["storeName"] || 'OfflineLeafletTileImages'
+    @_tileImagesStore = null
 
-    try
-      # Create the DB store and then call the @_onReady callback
-      imageRetriever = new ImageRetriever(this)
-      @_tileImagesStore = new ImageStore(this, imageRetriever, @_useWebSQL)
-      @_tileImagesStore.createDB(storeName, () =>
-        @_onReady()
-      )
-    catch err
-      @_reportError("COULD_NOT_CREATE_DB", err)
-      setTimeout(
-        () =>
+    if dbOption? and dbOption != "None"
+      try
+        if(dbOption == "WebSQL")
+          useWebSQL = true
+        else if(dbOption == "IndexedDB")
+          useWebSQL = false
+        else
+          throw new Error("Invalid dbOption parameter: " + dbOption)
+        # Create the DB store and then call the @_onReady callback
+        imageRetriever = new ImageRetriever(this)
+        @_tileImagesStore = new ImageStore(this, imageRetriever)
+        @_tileImagesStore.createDB(storeName, () =>
+            @_onReady()
+          , useWebSQL
+        )
+      catch err
+        @_reportError("COULD_NOT_CREATE_DB", err)
+        setTimeout(() =>
+            @_onReady()
+          , 1000
+        )
+    else
+      @_reportError("NO_DB", null)
+      setTimeout(() =>
           @_onReady()
         , 1000
       )
@@ -66,6 +80,9 @@ module.exports = class OfflineLayer extends L.TileLayer
     key = @_createTileKey(tilePoint.x, tilePoint.y, tilePoint.z)
     # Look for the tile in the DB
     @_tileImagesStore.get(key, onSuccess, onError)
+
+  useDB: () ->
+    return @_tileImagesStore != null
 
   cancel: () ->
     if @_tileImagesStore?

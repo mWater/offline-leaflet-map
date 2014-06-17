@@ -79,5 +79,5 @@ onError = (errorType, errorData1, errorData2) ->
   console.log(errorData1)
   console.log(errorData2)
 
-options = { maxZoom: 18, attribution: mapquestAttrib, subdomains: subDomains, onReady: onReady, onError: onError, storeName:"myStoreName"}
+options = { maxZoom: 18, attribution: mapquestAttrib, subdomains: subDomains, onReady: onReady, onError: onError, storeName:"myStoreName", dbOption:"WebSQL"}
 offlineLayer = new OfflineLayer( mapquestUrl, options)

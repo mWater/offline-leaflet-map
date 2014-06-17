@@ -20,13 +20,16 @@ module.exports = class ImageStore
       throw new Error('This async function needs a callback')
 
     if not _useWebSQL
+      console.log 'using Indexed DB'
       @storage = new IndexedDBDataStorage(storeName, onReady)
     else
+      console.log 'using Web SQL'
       @storage = new WebSQLDataStorage(storeName, onReady)
 
   cancel: () ->
     if @_myQueue?
-      @_myQueue.pause()
+      @_myQueue.kill()
+      @_finish()
       return true
     return false
 
@@ -43,9 +46,20 @@ module.exports = class ImageStore
       throw new Error('This async function needs callbacks')
     @storage.clear(onSuccess, onError)
 
+  _finish: (error) ->
+    @_eventEmitter.fire('tilecachingprogressdone', null)
+    @_myQueue = null
+    if error?
+      onError()
+    else
+      @_onSaveImagesSuccess()
+
   saveImages: (tileImagesToQuery, started, onSuccess, onError) ->
+    if @_myQueue?
+      throw new Error('Not allowed to save images while saving is already in progress')
     if not started? or not onSuccess? or not onError?
       throw new Error('This async function needs callbacks')
+    @_onSaveImagesSuccess = onSuccess
 
     @_getImagesNotInDB(tileImagesToQuery, (tileInfoOfImagesNotInDB) =>
       if tileInfoOfImagesNotInDB? and tileInfoOfImagesNotInDB.length > 0
@@ -53,19 +67,14 @@ module.exports = class ImageStore
           @_saveTile(data, callback)
         , 8);
         @_myQueue.drain = (error) =>
-          @_eventEmitter.fire('tilecachingprogressdone', null)
-          @_myQueue = null
-          if error?
-            onError()
-          else
-            onSuccess()
+          @_finish(error)
 
         @_myQueue.push data for data in tileInfoOfImagesNotInDB
         started()
       else
         #nothing to do
         started()
-        onSuccess()
+        @_onSaveImagesSuccess()
     )
 
   _getImagesNotInDB: (tileImagesToQuery, callback) ->
