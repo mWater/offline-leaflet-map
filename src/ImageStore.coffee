@@ -11,8 +11,10 @@ module.exports = class ImageStore
 
     @_eventEmitter = eventEmitter
     @_nbTilesLeftToSave = 0
+    @_nbImagesCurrentlyBeingRetrieved = 0
     @_imageRetriever = imageRetriever
     @_myQueue = null
+    @_beingCanceled = false
 
   createDB: (storeName, onReady, useWebSQL) ->
     _useWebSQL = useWebSQL
@@ -27,9 +29,14 @@ module.exports = class ImageStore
       @storage = new WebSQLDataStorage(storeName, onReady)
 
   cancel: () ->
+    if @_cancel
+      return true
+
     if @_myQueue?
       @_myQueue.kill()
-      @_finish()
+      @_beingCanceled = true
+      if @_nbImagesCurrentlyBeingRetrieved == 0
+        @_finish()
       return true
     return false
 
@@ -46,18 +53,21 @@ module.exports = class ImageStore
       throw new Error('This async function needs callbacks')
     @storage.clear(onSuccess, onError)
 
-  _finish: (error) ->
+  _finish: (error, onError) ->
+    @_beingCanceled = false
+    console.log 'finish'
     @_eventEmitter.fire('tilecachingprogressdone', null)
     @_myQueue = null
+    @_nbImagesCurrentlyBeingRetrieved = 0
     if error?
-      onError()
+      onError(error)
     else
       @_onSaveImagesSuccess()
 
-  saveImages: (tileImagesToQuery, started, onSuccess, onError) ->
+  saveImages: (tileImagesToQuery, onStarted, onSuccess, onError) ->
     if @_myQueue?
       throw new Error('Not allowed to save images while saving is already in progress')
-    if not started? or not onSuccess? or not onError?
+    if not onStarted? or not onSuccess? or not onError?
       throw new Error('This async function needs callbacks')
     @_onSaveImagesSuccess = onSuccess
 
@@ -67,13 +77,13 @@ module.exports = class ImageStore
           @_saveTile(data, callback)
         , 8);
         @_myQueue.drain = (error) =>
-          @_finish(error)
+          @_finish(error, onError)
 
         @_myQueue.push data for data in tileInfoOfImagesNotInDB
-        started()
+        onStarted()
       else
         #nothing to do
-        started()
+        onStarted()
         @_onSaveImagesSuccess()
     )
 
@@ -132,6 +142,7 @@ module.exports = class ImageStore
     canceled = () =>
       callback()
 
+    @_nbImagesCurrentlyBeingRetrieved++
     @_imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage, canceled)
 
   # called when the total number of tiles is known
@@ -142,4 +153,10 @@ module.exports = class ImageStore
   # called each time a tile as been handled
   _decrementNbTilesLeftToSave: () ->
     @_nbTilesLeftToSave--
-    @_eventEmitter.fire('tilecachingprogress', {nbTiles:@_nbTilesLeftToSave})
+    if not @_beingCanceled
+      @_eventEmitter.fire('tilecachingprogress', {nbTiles:@_nbTilesLeftToSave})
+
+    # I need to do this so the ImageStore only call finish when everything is done canceling
+    @_nbImagesCurrentlyBeingRetrieved--
+    if @_beingCanceled and @_nbImagesCurrentlyBeingRetrieved == 0
+      @_finish()

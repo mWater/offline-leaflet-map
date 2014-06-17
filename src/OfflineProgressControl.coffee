@@ -9,13 +9,14 @@ module.exports = class OfflineProgressControl extends L.Control
     @_counter.setAttribute('id', 'offlinemap-controls-counter')
     @_counter.innerHTML = "Ready"
 
-    cancelButton = L.DomUtil.create('input', 'offlinemap-controls-cancel-button', controls)
-    cancelButton.setAttribute('type', "button")
-    cancelButton.setAttribute('id', "cancelBtn")
-    cancelButton.setAttribute('value', "Cancel")
+    @_cancelButton = L.DomUtil.create('input', 'offlinemap-controls-cancel-button', controls)
+    @_cancelButton.setAttribute('type', "button")
+    @_cancelButton.setAttribute('id', "cancelBtn")
+    @_cancelButton.setAttribute('value', "Cancel")
+    @_cancelButton.setAttribute('disabled', true)
 
-    L.DomEvent.addListener(cancelButton, 'click', @onCancelClick, this)
-    L.DomEvent.disableClickPropagation(cancelButton)
+    L.DomEvent.addListener(@_cancelButton, 'click', @onCancelClick, this)
+    L.DomEvent.disableClickPropagation(@_cancelButton)
 
     return controls
 
@@ -25,9 +26,11 @@ module.exports = class OfflineProgressControl extends L.Control
     # is known.
     @_evaluating = true
     @_counter.innerHTML = "..."
+    @_cancelButton.removeAttribute('disabled')
 
   onProgressDone: () ->
     @_counter.innerHTML = "Ready"
+    @_cancelButton.removeAttribute('disabled')
 
   updateTotalNbTilesLeftToSave: (event) ->
     @_evaluating = false
@@ -44,6 +47,7 @@ module.exports = class OfflineProgressControl extends L.Control
   onCancelClick: () ->
     if @_offlineLayer.cancel()
       @_counter.innerHTML = "Canceling..."
+      @_cancelButton.setAttribute('disabled', true)
 
   setOfflineLayer: (offlineLayer) ->
     @_offlineLayer = offlineLayer

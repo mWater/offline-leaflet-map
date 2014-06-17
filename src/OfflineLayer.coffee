@@ -33,7 +33,6 @@ module.exports = class OfflineLayer extends L.TileLayer
           , 1000
         )
     else
-      @_reportError("NO_DB", null)
       setTimeout(() =>
           @_onReady()
         , 1000
@@ -74,8 +73,8 @@ module.exports = class OfflineLayer extends L.TileLayer
     onError = () =>
       # Error while getting the key from the DB
       # will get the tile from the map provider
-      self._setUpTile(tile, key, @getTileUrl(tilePoint))
-      self._reportError("INDEXED_DB_GET", key)
+      @_setUpTile(tile, key, @getTileUrl(tilePoint))
+      @_reportError("INDEXED_DB_GET", key)
 
     key = @_createTileKey(tilePoint.x, tilePoint.y, tilePoint.z)
     # Look for the tile in the DB
@@ -89,8 +88,8 @@ module.exports = class OfflineLayer extends L.TileLayer
       return @_tileImagesStore.cancel()
     return false
 
-  clearTiles: () ->
-    if(!@_tileImagesStore)
+  clearTiles: (onSuccess, onError) ->
+    if(!@useDB())
       @_reportError("NO_DB", "No DB available")
       return
 
@@ -98,16 +97,7 @@ module.exports = class OfflineLayer extends L.TileLayer
       alert("system is busy.")
       return
 
-    #lock UI
-    @_tileImagesStore.clear(
-      () =>
-        #unlock UI
-        null
-      ,
-      (error) =>
-        #unlock UI
-        null
-    )
+    @_tileImagesStore.clear(onSuccess, onError)
 
   # calculateNbTiles includes potentially already saved tiles.
   calculateNbTiles: (zoomLevelLimit) ->
@@ -169,7 +159,7 @@ module.exports = class OfflineLayer extends L.TileLayer
     return tileImagesToQuery
 
   # saves the tiles currently on screen + lower and higher zoom levels.
-  saveTiles: (zoomLevelLimit) ->
+  saveTiles: (zoomLevelLimit, onStarted, onSuccess, onError) ->
     if(!@_tileImagesStore)
       @_reportError("NO_DB", "No DB available")
       return
@@ -180,19 +170,7 @@ module.exports = class OfflineLayer extends L.TileLayer
 
     #lock UI
     tileImagesToQuery = @_getTileImages(zoomLevelLimit)
-    @_tileImagesStore.saveImages(tileImagesToQuery,
-      () =>
-        #unlock cancel
-        null
-      ,
-      () =>
-        #unlock UI
-        null
-      ,
-      (error) =>
-        #unlock UI
-        null
-    )
+    @_tileImagesStore.saveImages(tileImagesToQuery, onStarted, onSuccess, onError)
 
   _getZoomedInTiles: (x, y, currentZ, maxZ, tileImagesToQuery, minY, maxY, minX, maxX) ->
     @_getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, true)

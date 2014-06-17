@@ -4,4 +4,4 @@ module.exports = class BrokenImageRetriever
     null
 
   retrieveImage: (tileInfo, callback, error) ->
-    setTimeout(callback, 100)
+    setTimeout(error, 100)

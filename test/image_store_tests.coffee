@@ -80,7 +80,7 @@ module.exports = (useWebSQL) ->
         assert.fail()
       )
 
-    it.skip "can be canceled", (done) =>
+    it "can be canceled", (done) =>
       # use the BrokenImageRetriever (so nothing is ever retrieved)
       @imageStore._imageRetriever = new BrokenImageRetriever()
 
@@ -88,30 +88,26 @@ module.exports = (useWebSQL) ->
       imagesToSave = {}
       imagesToSave[key] = key
 
-      nbDone = 0
-      doneStep = () =>
-        nbDone++
-        if nbDone == 2
-          done()
-
       onStarted = () =>
+        console.log 'started'
         @imageStore.cancel()
 
       onSaveSuccess = () =>
-        doneStep()
+        console.log 'done'
+        @imageStore.get(key,
+          (image) ->
+            assert.isUndefined(image);
+            done()
+          ,
+          (error) ->
+            assert.fail()
+        )
 
       @imageStore.saveImages(imagesToSave, onStarted, onSaveSuccess, () =>
         assert.fail()
       )
 
-      @imageStore.get(key,
-      (image) ->
-        assert.isUndefined(image);
-        doneStep()
-      ,
-      (error) ->
-        assert.fail()
-      )
+
 
     it "can save multiple entries and retrieve them", (done) =>
       imagesToSave = {}
