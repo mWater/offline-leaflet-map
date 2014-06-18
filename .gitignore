@@ -8,3 +8,4 @@ demo/bundle.js
 dist/index.js
 lib/index.js
 lib/WebSQLDataStorage.js
+lib/
