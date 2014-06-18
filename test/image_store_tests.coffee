@@ -89,11 +89,9 @@ module.exports = (useWebSQL) ->
       imagesToSave[key] = key
 
       onStarted = () =>
-        console.log 'started'
         @imageStore.cancel()
 
       onSaveSuccess = () =>
-        console.log 'done'
         @imageStore.get(key,
           (image) ->
             assert.isUndefined(image);
