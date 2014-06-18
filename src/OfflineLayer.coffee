@@ -1,6 +1,16 @@
 ImageStore = require './ImageStore'
 ImageRetriever = require './ImageRetriever'
 
+# Main class of the project
+# By default, it behaves just like a L.TileLayer. If the dbOption is set to WebSQL or IndexedDB, it creates
+# a DB and starts querying the tiles and only loads the image from the image provider if they are not present in the
+# DB.
+# calculateNbTiles(zoomLimit) can be used to know how many tiles are currently being shown, including all the sub tiles up to
+# the zoomLimit
+# saveTiles(zoomLimit, ...) will cache all the tiles currently shown, including all the sub tiles up to the zoomLimit
+# Note: When dbOption is not set to WebSQL or IndexedDB, this class behaves just like a normal L.TileLayer
+# Note: saveTiles will also save all the zoomed out tiles
+
 module.exports = class OfflineLayer extends L.TileLayer
   initialize: (url, options) ->
     L.TileLayer.prototype.initialize.call(this, url, options)
@@ -38,6 +48,7 @@ module.exports = class OfflineLayer extends L.TileLayer
         , 1000
       )
 
+  # look at the code from T.TileLayer for more details
   _setUpTile: (tile, key, value) ->
     # Start loading the tile with either the cached tile image or the result of getTileUrl
     tile.src = value
@@ -51,6 +62,7 @@ module.exports = class OfflineLayer extends L.TileLayer
     if @_onError
       @_onError(errorType, errorData1, errorData2)
 
+  # look at the code from T.TileLayer for more details
   _loadTile: (tile, tilePoint) ->
     if not @_tileImagesStore
       return L.TileLayer.prototype._loadTile.call(this, tile, tilePoint)
@@ -172,6 +184,7 @@ module.exports = class OfflineLayer extends L.TileLayer
     tileImagesToQuery = @_getTileImages(zoomLevelLimit)
     @_tileImagesStore.saveImages(tileImagesToQuery, onStarted, onSuccess, onError)
 
+  # returns all the tiles with higher zoom levels
   _getZoomedInTiles: (x, y, currentZ, maxZ, tileImagesToQuery, minY, maxY, minX, maxX) ->
     @_getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, true)
 
@@ -186,6 +199,7 @@ module.exports = class OfflineLayer extends L.TileLayer
       @_getZoomedInTiles(x * 2, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX)
       @_getZoomedInTiles(x * 2 + 1, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX)
 
+  # returns all the tiles with lower zoom levels
   _getZoomedOutTiles: (x, y, currentZ, finalZ, tileImagesToQuery, minY, maxY, minX, maxX) ->
     @_getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, false)
 

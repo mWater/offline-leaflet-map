@@ -1,5 +1,8 @@
 IDBStore = require 'idb-wrapper'
 
+# Very simple, one to one matching of IDBStore methods, I could have directly used the IDBStore but I wanted to
+# have full control over the interface and hide the IDBStore construction.
+# The whole idea of that class is to have a fixed interface that WebSQLDataStorage can emulate.
 # NOTE: WebSQLDataStorage and IndexedDBDataStorage should have the same behavior
 module.exports = class IndexedDBDataStorage
   constructor: (storeName, onReady) ->

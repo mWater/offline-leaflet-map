@@ -2,6 +2,10 @@ async = require 'async'
 IndexedDBDataStorage = require './IndexedDBDataStorage'
 WebSQLDataStorage = require './WebSQLDataStorage'
 
+# Saves and stores images using either Web SQL or IndexedDB
+# Uses an async queue and can be canceled
+# Will emit events while the saving of images is in progress
+
 module.exports = class ImageStore
   constructor: (eventEmitter, imageRetriever) ->
     if not imageRetriever?
@@ -22,10 +26,8 @@ module.exports = class ImageStore
       throw new Error('This async function needs a callback')
 
     if not _useWebSQL
-      console.log 'using Indexed DB'
       @storage = new IndexedDBDataStorage(storeName, onReady)
     else
-      console.log 'using Web SQL'
       @storage = new WebSQLDataStorage(storeName, onReady)
 
   cancel: () ->
@@ -55,7 +57,6 @@ module.exports = class ImageStore
 
   _finish: (error, onError) ->
     @_beingCanceled = false
-    console.log 'finish'
     @_eventEmitter.fire('tilecachingprogressdone', null)
     @_myQueue = null
     @_nbImagesCurrentlyBeingRetrieved = 0
@@ -73,9 +74,10 @@ module.exports = class ImageStore
 
     @_getImagesNotInDB(tileImagesToQuery, (tileInfoOfImagesNotInDB) =>
       if tileInfoOfImagesNotInDB? and tileInfoOfImagesNotInDB.length > 0
+        MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8
         @_myQueue = async.queue((data, callback) =>
           @_saveTile(data, callback)
-        , 8);
+        , MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY);
         @_myQueue.drain = (error) =>
           @_finish(error, onError)
 
@@ -139,11 +141,8 @@ module.exports = class ImageStore
       @_eventEmitter._reportError(errorType, errorData, data.tileInfo)
       callback(errorType)
 
-    canceled = () =>
-      callback()
-
     @_nbImagesCurrentlyBeingRetrieved++
-    @_imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage, canceled)
+    @_imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage)
 
   # called when the total number of tiles is known
   _updateTotalNbImagesLeftToSave: (nbTiles) ->

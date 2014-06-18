@@ -1,3 +1,4 @@
+# Makes a ajax call to retrieve the image and returns it as Base64
 
 module.exports = class ImageRetriever
   constructor: (offlineLayer) ->

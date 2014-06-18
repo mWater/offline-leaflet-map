@@ -1,3 +1,5 @@
+# That control is part of the demo and is there to show how to handle the various callbacks and events of
+# the OfflineLayer
 
 module.exports = class OfflineProgressControl extends L.Control
 
