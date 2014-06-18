@@ -3,14 +3,14 @@
 module.exports = class IndexedDBDataStorage
   constructor: (storeName, onReady) ->
     @_storeName = storeName
-    @_webSQLDB = openDatabase('mydb', '1.0', 'my first database', 50 * 1024 * 1024)
-    @_webSQLDB.transaction((tx) ->
-      tx.executeSql("CREATE TABLE IF NOT EXISTS #{@_storeName} (key unique, image)")
+    @_webSQLDB = openDatabase('OfflineTileImages', '1.0', 'Store tile images for OfflineLeaftMap', 50 * 1024 * 1024)
+    @_webSQLDB.transaction((tx) =>
+      tx.executeSql("CREATE TABLE IF NOT EXISTS #{this._storeName} (key unique, image)")
       onReady()
     )
 
   get: (key, onSuccess, onError) ->
-    @_webSQLDB.transaction((tx) ->
+    @_webSQLDB.transaction((tx) =>
       onSQLSuccess = (tx, results) ->
         len = results.rows.length;
         if len == 0
@@ -20,17 +20,17 @@ module.exports = class IndexedDBDataStorage
         else
           onError('There should be no more than one entry')
 
-      tx.executeSql("SELECT * FROM #{@_storeName} WHERE key='#{key}'", [], onSQLSuccess, onError)
+      tx.executeSql("SELECT * FROM #{this._storeName} WHERE key='#{key}'", [], onSQLSuccess, onError)
     )
 
   clear: (onSuccess, onError) ->
-    @_webSQLDB.transaction((tx) ->
-      tx.executeSql("DELETE FROM #{@_storeName}", [], onSuccess, onError)
+    @_webSQLDB.transaction((tx) =>
+      tx.executeSql("DELETE FROM #{this._storeName}", [], onSuccess, onError)
     )
 
   put: (key, object, onSuccess, onError) ->
-    @_webSQLDB.transaction((tx) ->
-      tx.executeSql("INSERT OR REPLACE INTO #{@_storeName} VALUES (?, ?)", [key, object.image], onSuccess, onError)
+    @_webSQLDB.transaction((tx) =>
+      tx.executeSql("INSERT OR REPLACE INTO #{this._storeName} VALUES (?, ?)", [key, object.image], onSuccess, onError)
     )
 
   # That one is trickier
@@ -41,7 +41,7 @@ module.exports = class IndexedDBDataStorage
     if tileImagesToQueryArray.length == 0
       onSuccess([])
 
-    @_webSQLDB.transaction((tx) ->
+    @_webSQLDB.transaction((tx) =>
       result = []
       tileImagesToQueryArray2 = []
       # 2 things are being done here
@@ -61,5 +61,5 @@ module.exports = class IndexedDBDataStorage
             result[index] = item
         onSuccess(result)
 
-      tx.executeSql("SELECT * FROM #{@_storeName} WHERE key IN (#{keys})", [], onSQLSuccess, onError)
+      tx.executeSql("SELECT * FROM #{this._storeName} WHERE key IN (#{keys})", [], onSQLSuccess, onError)
     )

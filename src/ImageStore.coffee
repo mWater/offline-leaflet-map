@@ -72,24 +72,28 @@ module.exports = class ImageStore
       throw new Error('This async function needs callbacks')
     @_onSaveImagesSuccess = onSuccess
 
-    @_getImagesNotInDB(tileImagesToQuery, (tileInfoOfImagesNotInDB) =>
-      if tileInfoOfImagesNotInDB? and tileInfoOfImagesNotInDB.length > 0
-        MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8
-        @_myQueue = async.queue((data, callback) =>
-          @_saveTile(data, callback)
-        , MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY);
-        @_myQueue.drain = (error) =>
-          @_finish(error, onError)
+    @_getImagesNotInDB(tileImagesToQuery,
+      (tileInfoOfImagesNotInDB) =>
+        if tileInfoOfImagesNotInDB? and tileInfoOfImagesNotInDB.length > 0
+          MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8
+          @_myQueue = async.queue((data, callback) =>
+            @_saveTile(data, callback)
+          , MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY);
+          @_myQueue.drain = (error) =>
+            @_finish(error, onError)
 
-        @_myQueue.push data for data in tileInfoOfImagesNotInDB
-        onStarted()
-      else
-        #nothing to do
-        onStarted()
-        @_onSaveImagesSuccess()
+          @_myQueue.push data for data in tileInfoOfImagesNotInDB
+          onStarted()
+        else
+          #nothing to do
+          onStarted()
+          @_onSaveImagesSuccess()
+      ,
+      (error) ->
+        onError(error)
     )
 
-  _getImagesNotInDB: (tileImagesToQuery, callback) ->
+  _getImagesNotInDB: (tileImagesToQuery, callback, onError) ->
     tileImagesToQueryArray = []
 
     for imageKey of tileImagesToQuery
@@ -119,8 +123,8 @@ module.exports = class ImageStore
 
         callback(tileInfoOfImagesNotInDB)
       ,
-      (error) =>
-        @_onBatchQueryError(error)
+      (error) ->
+        onError(error)
     )
 
   _saveTile: (data, callback) ->

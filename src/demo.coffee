@@ -64,7 +64,8 @@ class CacheBtnControl extends L.Control
         () =>
           @_setIdleState()
         ,
-        () =>
+        (error) =>
+          console.log(error)
           @_setIdleState()
       )
     else
@@ -85,7 +86,8 @@ class CacheBtnControl extends L.Control
         () =>
           @_setIdleState()
         ,
-        () =>
+        (error) =>
+          console.log(error)
           @_setIdleState()
       )
     else
