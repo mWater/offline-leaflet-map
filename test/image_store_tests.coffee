@@ -80,16 +80,16 @@ module.exports = (useWebSQL) ->
         assert.fail()
       )
 
-    it "can be canceled", (done) =>
+    it "can be canceled before image retrieving has started", (done) =>
       # use the BrokenImageRetriever (so nothing is ever retrieved)
-      @imageStore._imageRetriever = new BrokenImageRetriever()
+      @imageStore._imageRetriever = new FakeImageRetriever()
 
       key = "1:2:3"
       imagesToSave = {}
       imagesToSave[key] = key
 
       onStarted = () =>
-        @imageStore.cancel()
+        null
 
       onSaveSuccess = () =>
         @imageStore.get(key,
@@ -105,7 +105,26 @@ module.exports = (useWebSQL) ->
         assert.fail()
       )
 
+      @imageStore.cancel()
 
+
+    it "can be canceled after image retrieving has started", (done) =>
+      # use the BrokenImageRetriever (so nothing is ever retrieved)
+      @imageStore._imageRetriever = new FakeImageRetriever()
+
+      key = "1:2:3"
+      imagesToSave = {}
+      imagesToSave[key] = key
+
+      onStarted = () =>
+        setTimeout(@imageStore.cancel, 10)
+
+      onSaveSuccess = () =>
+        checkKey(key, done)
+
+      @imageStore.saveImages(imagesToSave, onStarted, onSaveSuccess, () =>
+        assert.fail()
+      )
 
     it "can save multiple entries and retrieve them", (done) =>
       imagesToSave = {}

@@ -19,6 +19,7 @@ module.exports = class ImageStore
     @_imageRetriever = imageRetriever
     @_myQueue = null
     @_beingCanceled = false
+    @_running = false
 
   createDB: (storeName, onReady, useWebSQL) ->
     _useWebSQL = useWebSQL
@@ -31,19 +32,22 @@ module.exports = class ImageStore
       @storage = new WebSQLDataStorage(storeName, onReady)
 
   cancel: () ->
-    if @_cancel
+    if not @_running
+      return false
+
+    if @_beingCanceled
       return true
 
+    @_beingCanceled = true
     if @_myQueue?
       @_myQueue.kill()
-      @_beingCanceled = true
       if @_nbImagesCurrentlyBeingRetrieved == 0
         @_finish()
       return true
     return false
 
   isBusy: () ->
-    return @_myQueue?
+    return @_running
 
   get: (key, onSuccess, onError) ->
     if not onSuccess? or not onError?
@@ -56,6 +60,7 @@ module.exports = class ImageStore
     @storage.clear(onSuccess, onError)
 
   _finish: (error, onError) ->
+    @_running = false
     @_beingCanceled = false
     @_eventEmitter.fire('tilecachingprogressdone', null)
     @_myQueue = null
@@ -66,6 +71,7 @@ module.exports = class ImageStore
       @_onSaveImagesSuccess()
 
   saveImages: (tileImagesToQuery, onStarted, onSuccess, onError) ->
+    @_running = true
     if @_myQueue?
       throw new Error('Not allowed to save images while saving is already in progress')
     if not onStarted? or not onSuccess? or not onError?
@@ -74,7 +80,7 @@ module.exports = class ImageStore
 
     @_getImagesNotInDB(tileImagesToQuery,
       (tileInfoOfImagesNotInDB) =>
-        if tileInfoOfImagesNotInDB? and tileInfoOfImagesNotInDB.length > 0
+        if not @_beingCanceled and tileInfoOfImagesNotInDB? and tileInfoOfImagesNotInDB.length > 0
           MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8
           @_myQueue = async.queue((data, callback) =>
             @_saveTile(data, callback)
