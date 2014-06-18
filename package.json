@@ -4,7 +4,8 @@
   "description": "A Leaflet TileLayer with offline capabilities.",
   "main": "lib/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "testem ci",
+    "prepublish": "gulp"
   },
   "browserify": {
     "transform": [
@@ -15,9 +16,7 @@
   "author": "Mathieu Briau",
   "license": "GPLv3",
   "devDependencies": {
-    "grunt": "^0.4.4",
     "browserify": "^3.40.0",
-    "grunt-browserify": "^2.0.3",
     "gulp": "^3.7.0",
     "coffee-script": "^1.7.1",
     "gulp-coffee": "^2.0.1",
