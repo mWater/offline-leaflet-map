@@ -1,12 +1,12 @@
 # NOTE: WebSQLDataStorage and IndexedDBDataStorage should have the same behavior
 # The system was designed with Indexed DB, so WebSQLDataStorage is copying the behavior of IndexedDB
-module.exports = class IndexedDBDataStorage
-  constructor: (storeName, onReady) ->
+module.exports = class WebSQLDataStorage
+  constructor: (storeName, onReady, onError) ->
     @_storeName = storeName
     @_webSQLDB = openDatabase('OfflineTileImages', '1.0', 'Store tile images for OfflineLeaftMap', 50 * 1024 * 1024)
     @_webSQLDB.transaction((tx) =>
-      tx.executeSql("CREATE TABLE IF NOT EXISTS #{this._storeName} (key unique, image)")
-      onReady()
+        tx.executeSql("CREATE TABLE IF NOT EXISTS #{this._storeName} (key unique, image)")
+      , onError, onReady
     )
 
   get: (key, onSuccess, onError) ->

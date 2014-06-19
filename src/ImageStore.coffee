@@ -21,15 +21,15 @@ module.exports = class ImageStore
     @_beingCanceled = false
     @_running = false
 
-  createDB: (storeName, onReady, useWebSQL) ->
+  createDB: (storeName, onReady, onError, useWebSQL) ->
     _useWebSQL = useWebSQL
     if not onReady?
       throw new Error('This async function needs a callback')
 
     if not _useWebSQL
-      @storage = new IndexedDBDataStorage(storeName, onReady)
+      @storage = new IndexedDBDataStorage(storeName, onReady, onError)
     else
-      @storage = new WebSQLDataStorage(storeName, onReady)
+      @storage = new WebSQLDataStorage(storeName, onReady, onError)
 
   cancel: () ->
     if not @_running

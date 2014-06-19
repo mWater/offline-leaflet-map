@@ -36,7 +36,10 @@ module.exports = (useWebSQL) ->
           assert(false, "Not possible to clean the DB.")
           done()
         )
-      @imageStore.createDB("test", clear, useWebSQL)
+      @imageStore.createDB("test", clear, () ->
+          console.log 'ERROR'
+          assert.fail()
+        , useWebSQL)
     )
 
     it "is constructed with an EventEmitter and an ImageRetriever", ->

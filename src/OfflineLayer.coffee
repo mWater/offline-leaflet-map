@@ -29,11 +29,16 @@ module.exports = class OfflineLayer extends L.TileLayer
           useWebSQL = false
         else
           throw new Error("Invalid dbOption parameter: " + dbOption)
+
         # Create the DB store and then call the @_onReady callback
         imageRetriever = new ImageRetriever(this)
         @_tileImagesStore = new ImageStore(this, imageRetriever)
-        @_tileImagesStore.createDB(storeName, () =>
-            @_onReady()
+        @_tileImagesStore.createDB(storeName,
+            () =>
+              @_onReady()
+          ,
+            (error) =>
+              @_reportError("COULD_NOT_CREATE_DB", error)
           , useWebSQL
         )
       catch err

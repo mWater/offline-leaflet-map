@@ -5,13 +5,13 @@ IDBStore = require 'idb-wrapper'
 # The whole idea of that class is to have a fixed interface that WebSQLDataStorage can emulate.
 # NOTE: WebSQLDataStorage and IndexedDBDataStorage should have the same behavior
 module.exports = class IndexedDBDataStorage
-  constructor: (storeName, onReady) ->
+  constructor: (storeName, onReady, onError) ->
     @_idbStore = new IDBStore({
       dbVersion: 1,
       storeName: storeName,
       keyPath: null,
       autoIncrement: false
-    }, onReady)
+    }, onReady, onError)
 
   get: (key, onSuccess, onError) ->
     @_idbStore.get(key, onSuccess, onError)
