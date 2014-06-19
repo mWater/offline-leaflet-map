@@ -53,7 +53,7 @@ module.exports = class OfflineLayer extends L.TileLayer
         , 1000
       )
 
-  # look at the code from T.TileLayer for more details
+  # look at the code from L.TileLayer for more details
   _setUpTile: (tile, key, value) ->
     # Start loading the tile with either the cached tile image or the result of getTileUrl
     tile.src = value
@@ -67,7 +67,7 @@ module.exports = class OfflineLayer extends L.TileLayer
     if @_onError
       @_onError(errorType, errorData1, errorData2)
 
-  # look at the code from T.TileLayer for more details
+  # look at the code from L.TileLayer for more details
   _loadTile: (tile, tilePoint) ->
     if not @_tileImagesStore
       return L.TileLayer.prototype._loadTile.call(this, tile, tilePoint)
