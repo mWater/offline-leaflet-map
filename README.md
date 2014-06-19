@@ -63,8 +63,11 @@ This could happen if these functions are called before the onReady callback or i
 
 **saveTiles() errors:**
 
-* **"INDEXED\_DB\_BATCH":** An error occurred when calling getBatch on IndexedDB
-* **"INDEXED\_DB\_GET":** An error occurred when calling get on IndexedDB. ErrorData1 is the DB key of the tile.
+* **"COULD\_NOT\_CREATE\_DB":** Could not create DB.
+* **"COULD\_NOT\_CLEAR\_DB":** Could not clear DB.
+* **"SYSTEM\_BUSY":** System is busy.
+* **"SAVING\_TILES":** An error occurred when calling saveTiles.
+* **"DB\_GET":** An error occurred when calling get on ImageStore. ErrorData1 is the DB key of the tile.
 * **"GET\_STATUS\_ERROR":** The XMLHttpRequest Get status is not equal to 200. ErrorData1 is the error from XMLHttpRequest.
 ErrorData2 is the URL of the image.
 * **"NETWORK\_ERROR":** The XMLHttpRequest used to get an image threw an error. ErrorData1 is the error from XMLHttpRequest.

@@ -28,7 +28,7 @@ module.exports = class OfflineLayer extends L.TileLayer
         else if(dbOption == "IndexedDB")
           useWebSQL = false
         else
-          throw new Error("Invalid dbOption parameter: " + dbOption)
+          @_onError("COULD_NOT_CREATE_DB", "Invalid dbOption parameter: " + dbOption)
 
         # Create the DB store and then call the @_onReady callback
         imageRetriever = new ImageRetriever(this)
@@ -91,7 +91,7 @@ module.exports = class OfflineLayer extends L.TileLayer
       # Error while getting the key from the DB
       # will get the tile from the map provider
       @_setUpTile(tile, key, @getTileUrl(tilePoint))
-      @_reportError("INDEXED_DB_GET", key)
+      @_reportError("DB_GET", key)
 
     key = @_createTileKey(tilePoint.x, tilePoint.y, tilePoint.z)
     # Look for the tile in the DB
@@ -108,10 +108,12 @@ module.exports = class OfflineLayer extends L.TileLayer
   clearTiles: (onSuccess, onError) ->
     if(!@useDB())
       @_reportError("NO_DB", "No DB available")
+      onError("No DB available")
       return
 
     if(@isBusy())
-      alert("system is busy.")
+      @_reportError("SYSTEM_BUSY", "System is busy.")
+      onError("System is busy.")
       return
 
     @_tileImagesStore.clear(onSuccess, (error) =>
