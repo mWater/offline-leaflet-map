@@ -114,7 +114,10 @@ module.exports = class OfflineLayer extends L.TileLayer
       alert("system is busy.")
       return
 
-    @_tileImagesStore.clear(onSuccess, onError)
+    @_tileImagesStore.clear(onSuccess, (error) =>
+      @_reportError("COULD_NOT_CLEAR_DB", error)
+      onError(error)
+    )
 
   # calculateNbTiles includes potentially already saved tiles.
   calculateNbTiles: (zoomLevelLimit) ->
@@ -179,15 +182,20 @@ module.exports = class OfflineLayer extends L.TileLayer
   saveTiles: (zoomLevelLimit, onStarted, onSuccess, onError) ->
     if(!@_tileImagesStore)
       @_reportError("NO_DB", "No DB available")
+      onError("No DB available")
       return
 
     if(@isBusy())
-      alert("system is busy.")
+      @_reportError("SYSTEM_BUSY", "system is busy.")
+      onError("system is busy.")
       return
 
     #lock UI
     tileImagesToQuery = @_getTileImages(zoomLevelLimit)
-    @_tileImagesStore.saveImages(tileImagesToQuery, onStarted, onSuccess, onError)
+    @_tileImagesStore.saveImages(tileImagesToQuery, onStarted, onSuccess, (error) =>
+      @_reportError("SAVING_TILES", error)
+      onError(error)
+    )
 
   # returns all the tiles with higher zoom levels
   _getZoomedInTiles: (x, y, currentZ, maxZ, tileImagesToQuery, minY, maxY, minX, maxX) ->
@@ -227,9 +235,6 @@ module.exports = class OfflineLayer extends L.TileLayer
     key = @_createTileKey(x, y, z)
     if(!tileImagesToQuery[key])
       tileImagesToQuery[key] = {key:key, x: x, y: y, z: z}
-
-  _onBatchQueryError: (errorData) ->
-    @_reportError("INDEXED_DB_BATCH", errorData)
 
   _createNormalizedTilePoint: (x, y, z) ->
     nbTilesAtZoomLevel = Math.pow(2, z)
