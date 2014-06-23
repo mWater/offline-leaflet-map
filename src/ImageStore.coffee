@@ -93,7 +93,7 @@ module.exports = class ImageStore
         else
           #nothing to do
           onStarted()
-          @_onSaveImagesSuccess()
+          @_finish()
       ,
       (error) ->
         onError(error)
