@@ -20,6 +20,9 @@ module.exports = class OfflineLayer extends L.TileLayer
     dbOption = options["dbOption"]
     storeName = options["storeName"] || 'OfflineLeafletTileImages'
     @_tileImagesStore = null
+    @_minZoomLevel = 12
+    if options["minZoomLevel"]?
+      @_minZoomLevel = parseInt(options["minZoomLevel"])
 
     if dbOption? and dbOption != "None"
       try
@@ -123,6 +126,10 @@ module.exports = class OfflineLayer extends L.TileLayer
 
   # calculateNbTiles includes potentially already saved tiles.
   calculateNbTiles: (zoomLevelLimit) ->
+    if @_map.getZoom() < @_minZoomLevel
+      @_reportError("ZOOM_LEVEL_TOO_LOW")
+      return -1
+
     count = 0
     tileImagesToQuery = @_getTileImages(zoomLevelLimit)
     for key of tileImagesToQuery
@@ -190,6 +197,11 @@ module.exports = class OfflineLayer extends L.TileLayer
     if(@isBusy())
       @_reportError("SYSTEM_BUSY", "system is busy.")
       onError("system is busy.")
+      return
+
+    if @_map.getZoom() < @_minZoomLevel
+      @_reportError("ZOOM_LEVEL_TOO_LOW")
+      onError("ZOOM_LEVEL_TOO_LOW")
       return
 
     #lock UI

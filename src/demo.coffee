@@ -52,6 +52,8 @@ class CacheBtnControl extends L.Control
     # Might be a good idea to put a limit on the number of tiles that can would be saved
     # calculateNbTiles includes potentially already saved tiles.
     nbTiles = offlineLayer.calculateNbTiles();
+    if nbTiles == -1
+      return
     if(nbTiles < 10000)
       console.log("Will be saving: " + nbTiles + " tiles");
 
