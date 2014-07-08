@@ -148,7 +148,7 @@ module.exports = class ImageStore
 
     errorGettingImage = (errorType, errorData) =>
       @_decrementNbTilesLeftToSave()
-      @_eventEmitter._reportError(errorType, errorData, data.tileInfo)
+      @_eventEmitter._reportError(errorType, {data: errorData, tileInfo: data.tileInfo})
       callback(errorType)
 
     @_nbImagesCurrentlyBeingRetrieved++

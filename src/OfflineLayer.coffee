@@ -41,19 +41,25 @@ module.exports = class OfflineLayer extends L.TileLayer
               @_onReady()
           ,
             (error) =>
+              @_tileImagesStore = null
               @_reportError("COULD_NOT_CREATE_DB", error)
+              setTimeout(() =>
+                  @_onReady()
+                , 0
+              )
           , useWebSQL
         )
       catch err
+        @_tileImagesStore = null
         @_reportError("COULD_NOT_CREATE_DB", err)
         setTimeout(() =>
             @_onReady()
-          , 1000
+          , 0
         )
     else
       setTimeout(() =>
           @_onReady()
-        , 1000
+        , 0
       )
 
   # look at the code from L.TileLayer for more details
@@ -66,9 +72,9 @@ module.exports = class OfflineLayer extends L.TileLayer
       }
     )
 
-  _reportError: (errorType, errorData1, errorData2) ->
+  _reportError: (errorType, errorData) ->
     if @_onError
-      @_onError(errorType, errorData1, errorData2)
+      @_onError(errorType, errorData)
 
   # look at the code from L.TileLayer for more details
   _loadTile: (tile, tilePoint) ->

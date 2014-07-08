@@ -14,7 +14,7 @@ It is initialized the same way, using url and options but it has extra options:
 * **onReady:** All db operations are asynch, onReady will be called when the DB is ready and tile images can be
      retrieved.
 * **dbOption:** Can choose storage by setting to "WebSQL" or "IndexedDB". "None" or null will not use any DB.
-* onError(optional): Will be called if anything goes wrong with (errorType, errorData, ...), more details in Errors section.
+* onError(optional): Will be called if anything goes wrong with (errorType, errorData), more details in Errors section.
 * storeName(optional): If you ever need to change the default storeName: "OfflineLeafletTileImages".
 
 **Methods:**
@@ -49,12 +49,12 @@ OfflineLayer fires the following events while saving tiles:
 
 ##Error callback:
 
-When calling the onError callback, the parameters are (errorType, errorData1, errorData2)
+When calling the onError callback, the parameters are (errorType, errorData)
 
 **new OfflineLayer errors:**
 
 * **"COULD\_NOT\_CREATE\_DB":** An error has been thrown when creating the DB (calling new IDBStore internally).
-ErrorData1 is the error thrown by the IDBStore.
+errorData is the error thrown by the IDBStore.
 * **"NO\_DB":** Calling clearTiles() or saveTiles() will doing nothing but call the error callback if there is no DB.
 This could happen if these functions are called before the onReady callback or if the DB could not be initialized
 (previous error).
@@ -64,11 +64,9 @@ This could happen if these functions are called before the onReady callback or i
 **saveTiles() errors:**
 * **"SYSTEM\_BUSY":** System is busy.
 * **"SAVING\_TILES":** An error occurred when calling saveTiles.
-* **"DB\_GET":** An error occurred when calling get on ImageStore. ErrorData1 is the DB key of the tile.
-* **"GET\_STATUS\_ERROR":** The XMLHttpRequest Get status is not equal to 200. ErrorData1 is the error from XMLHttpRequest.
-ErrorData2 is the URL of the image.
-* **"NETWORK\_ERROR":** The XMLHttpRequest used to get an image threw an error. ErrorData1 is the error from XMLHttpRequest.
-ErrorData2 is the URL of the image.
+* **"DB\_GET":** An error occurred when calling get on ImageStore. errorData is the DB key of the tile.
+* **"GET\_STATUS\_ERROR":** The XMLHttpRequest Get status is not equal to 200. errorData contains the error from XMLHttpRequest and the URL of the image.
+* **"NETWORK\_ERROR":** The XMLHttpRequest used to get an image threw an error. errorData contains the error from XMLHttpRequest and the URL of the image.
 
 **clearTiles() errors:**
 * **"SYSTEM\_BUSY":** System is busy.
