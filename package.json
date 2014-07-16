@@ -17,14 +17,17 @@
   "license": "GPLv3",
   "devDependencies": {
     "browserify": "^3.40.0",
-    "gulp": "^3.7.0",
+    "chai": "^1.9.1",
     "coffee-script": "^1.7.1",
-    "gulp-coffee": "^2.0.1",
-    "gulp-util": "^2.2.16",
-    "testem": "^0.6.16",
     "coffeeify": "^0.6.0",
     "glob": "^4.0.2",
-    "chai": "^1.9.1",
+    "gulp": "^3.7.0",
+    "gulp-coffee": "^2.0.1",
+    "gulp-rename": "^1.2.0",
+    "gulp-uglify": "^0.3.1",
+    "gulp-util": "^2.2.16",
+    "testem": "^0.6.16",
+    "vinyl-buffer": "0.0.0",
     "vinyl-source-stream": "^0.1.1"
   },
   "dependencies": {

@@ -1,478 +1,1193 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var queue = require('queue-async');
-var IDBStore = require('idb-wrapper');
+(function (process){
+/*!
+ * async
+ * https://github.com/caolan/async
+ *
+ * Copyright 2010-2014 Caolan McMahon
+ * Released under the MIT license
+ */
+/*jshint onevar: false, indent:4 */
+/*global setImmediate: false, setTimeout: false, console: false */
+(function () {
 
-OfflineLayer = L.TileLayer.extend({
-    initialize: function (url, options) {
-        L.TileLayer.prototype.initialize.call(this, url, options);
+    var async = {};
 
-        this._onReady = options["onReady"];
-        this._onError = options["onError"];
-        var storeName = options["storeName"] || 'OfflineLeafletTileImages';
+    // global on the server, window in the browser
+    var root, previous_async;
 
-        this._hasBeenCanceled = false;
-        this._nbTilesLeftToSave = 0;
-        this._nbTilesWithError = 0;
+    root = this;
+    if (root != null) {
+      previous_async = root.async;
+    }
 
-        try
-        {
-            // Create the DB store and then call the this._onReady callback
-            this._tileImagesStore = new IDBStore({
-                dbVersion: 1,
-                storeName: storeName,
-                keyPath: null,
-                autoIncrement: false
-            }, this._onReady);
+    async.noConflict = function () {
+        root.async = previous_async;
+        return async;
+    };
+
+    function only_once(fn) {
+        var called = false;
+        return function() {
+            if (called) throw new Error("Callback was already called.");
+            called = true;
+            fn.apply(root, arguments);
         }
-        catch(err)
-        {
-            var self = this;
-            this._reportError("COULD_NOT_CREATE_DB", err);
-            setTimeout( function () {self._onReady();}, 1000);
-        }
-    },
+    }
 
-    _setUpTile: function (tile, key, value) {
-        // Start loading the tile with either the cached tile image or the result of getTileUrl
-        tile.src = value;
-        this.fire('tileloadstart', {
-            tile: tile,
-            url: tile.src
+    //// cross-browser compatiblity functions ////
+
+    var _toString = Object.prototype.toString;
+
+    var _isArray = Array.isArray || function (obj) {
+        return _toString.call(obj) === '[object Array]';
+    };
+
+    var _each = function (arr, iterator) {
+        if (arr.forEach) {
+            return arr.forEach(iterator);
+        }
+        for (var i = 0; i < arr.length; i += 1) {
+            iterator(arr[i], i, arr);
+        }
+    };
+
+    var _map = function (arr, iterator) {
+        if (arr.map) {
+            return arr.map(iterator);
+        }
+        var results = [];
+        _each(arr, function (x, i, a) {
+            results.push(iterator(x, i, a));
         });
-    },
+        return results;
+    };
 
-    _reportError: function(errorType, errorData1, errorData2) {
-        if(this._onError){
-            this._onError(errorType, errorData1, errorData2);
+    var _reduce = function (arr, iterator, memo) {
+        if (arr.reduce) {
+            return arr.reduce(iterator, memo);
         }
-    },
+        _each(arr, function (x, i, a) {
+            memo = iterator(memo, x, i, a);
+        });
+        return memo;
+    };
 
-    _loadTile: function (tile, tilePoint) {
-        if(!this._tileImagesStore){
-            return L.TileLayer.prototype._loadTile.call(this, tile, tilePoint);
+    var _keys = function (obj) {
+        if (Object.keys) {
+            return Object.keys(obj);
         }
-
-        // Reproducing TileLayer._loadTile behavior, but the tile.src will be set later
-        tile._layer = this;
-        tile.onerror = this._tileOnError;
-        this._adjustTilePoint(tilePoint);
-        tile.onload = this._tileOnLoad;
-        // Done reproducing _loadTile
-
-        var self = this;
-        var onSuccess = function(dbEntry){
-            if(dbEntry){
-                // if the tile has been cached, use the stored Base64 value
-                self._setUpTile(tile, key, dbEntry.image);
-            }
-            else{
-                // query the map provider for the tile
-                self._setUpTile(tile, key, self.getTileUrl(tilePoint));
+        var keys = [];
+        for (var k in obj) {
+            if (obj.hasOwnProperty(k)) {
+                keys.push(k);
             }
         }
+        return keys;
+    };
 
-        var onError = function() {
-            // Error while getting the key from the DB
-            // will get the tile from the map provider
-            self._setUpTile(tile, key, this.getTileUrl(tilePoint));
-            self._reportError("INDEXED_DB_GET", key);
+    //// exported async module functions ////
+
+    //// nextTick implementation with browser-compatible fallback ////
+    if (typeof process === 'undefined' || !(process.nextTick)) {
+        if (typeof setImmediate === 'function') {
+            async.nextTick = function (fn) {
+                // not a direct alias for IE10 compatibility
+                setImmediate(fn);
+            };
+            async.setImmediate = async.nextTick;
         }
-
-        var key = this._createTileKey(tilePoint.x, tilePoint.y, tilePoint.z);
-        // Look for the tile in the DB
-        this._tileImagesStore.get(key, onSuccess, onError);
-    },
-
-    // called when the total number of tiles is known
-    _updateTotalNbImagesLeftToSave: function(nbTiles){
-        this._nbTilesLeftToSave = nbTiles;
-        this.fire('tilecachingprogressstart', {nbTiles: this._nbTilesLeftToSave});
-    },
-
-    // called each time a tile as been handled
-    _decrementNbTilesLeftToSave: function(){
-        this._nbTilesLeftToSave--;
-        this.fire('tilecachingprogress', {nbTiles:this._nbTilesLeftToSave});
-    },
-
-    _incrementNbTilesWithError: function(){
-        //Not used for now...
-        this._nbTilesWithError++;
-    },
-
-    cancel: function(){
-        // no reason to cancel if it's not doing anything
-        if(this._myQueue){
-            this._hasBeenCanceled = true;
-            return true;
+        else {
+            async.nextTick = function (fn) {
+                setTimeout(fn, 0);
+            };
+            async.setImmediate = async.nextTick;
         }
-        return false;
-    },
-
-    clearTiles: function(){
-        if(!this._tileImagesStore){
-            this._reportError("NO_DB", "No DB available");
-            return;
+    }
+    else {
+        async.nextTick = process.nextTick;
+        if (typeof setImmediate !== 'undefined') {
+            async.setImmediate = function (fn) {
+              // not a direct alias for IE10 compatibility
+              setImmediate(fn);
+            };
         }
-
-        this._tileImagesStore.clear();
-    },
-
-    // calculateNbTiles includes potentially already saved tiles.
-    calculateNbTiles: function(zoomLevelLimit){
-        var count = 0;
-        var tileImagesToQuery = this._getTileImages(zoomLevelLimit);
-        for(var key in tileImagesToQuery){
-            count++;
+        else {
+            async.setImmediate = async.nextTick;
         }
-        return count;
-    },
+    }
 
-    isBusy: function(){
-        return this._myQueue || this._hasBeenCanceled;
-    },
-
-    // Returns the tiles currently displayed
-    // this._tiles could return tiles that are currently loaded but not displayed
-    // that is why the tiles are recalculated here.
-    _getTileImages: function(zoomLevelLimit){
-        zoomLevelLimit = zoomLevelLimit || this._map.getMaxZoom();
-
-        var tileImagesToQuery = {};
-
-        var map = this._map;
-        var startingZoom = map.getZoom();
-        var bounds = map.getPixelBounds();
-        var tileSize = this._getTileSize();
-
-        // bounds are rounded down since a tile cover all the pixels from it's rounded down value until the next tile
-        var roundedTileBounds = L.bounds(
-            bounds.min.divideBy(tileSize)._floor(),
-            bounds.max.divideBy(tileSize)._floor());
-
-        var tilesInScreen = [];
-        var j, i;
-
-        for (j = roundedTileBounds.min.y; j <= roundedTileBounds.max.y; j++) {
-            for (i = roundedTileBounds.min.x; i <= roundedTileBounds.max.x; i++) {
-                tilesInScreen.push(new L.Point(i, j));
-            }
+    async.each = function (arr, iterator, callback) {
+        callback = callback || function () {};
+        if (!arr.length) {
+            return callback();
         }
-
-        // We will use the exact bound values to test if sub tiles are still inside these bounds.
-        // The idea is to avoid caching images outside the screen.
-        var tileBounds = L.bounds(
-            bounds.min.divideBy(tileSize),
-            bounds.max.divideBy(tileSize));
-        var minY = tileBounds.min.y;
-        var maxY = tileBounds.max.y;
-        var minX = tileBounds.min.x;
-        var maxX = tileBounds.max.x;
-
-        var arrayLength = tilesInScreen.length;
-        for (var i = 0; i < arrayLength; i++){
-            var point = tilesInScreen[i];
-            var x = point.x;
-            var y = point.y;
-            this._getZoomedInTiles(x, y, startingZoom, zoomLevelLimit, tileImagesToQuery, minY, maxY, minX, maxX);
-            this._getZoomedOutTiles(x, y, startingZoom, 0, tileImagesToQuery, minY, maxY, minX, maxX);
+        var completed = 0;
+        _each(arr, function (x) {
+            iterator(x, only_once(done) );
+        });
+        function done(err) {
+          if (err) {
+              callback(err);
+              callback = function () {};
+          }
+          else {
+              completed += 1;
+              if (completed >= arr.length) {
+                  callback();
+              }
+          }
         }
+    };
+    async.forEach = async.each;
 
-        return tileImagesToQuery;
-    },
-
-    // saves the tiles currently on screen + lower and higher zoom levels.
-    saveTiles: function(zoomLevelLimit){
-        if(!this._tileImagesStore){
-            this._reportError("NO_DB", "No DB available");
-            return;
+    async.eachSeries = function (arr, iterator, callback) {
+        callback = callback || function () {};
+        if (!arr.length) {
+            return callback();
         }
-
-        if(this.isBusy()){
-            alert("system is busy.");
-            return;
-        }
-
-        this._hasBeenCanceled = false;
-
-        var tileImagesToQuery = this._getTileImages(zoomLevelLimit);
-
-        var tileImagesToQueryArray = [];
-        for(var key in tileImagesToQuery){
-            tileImagesToQueryArray.push(key);
-        }
-
-        var self = this;
-        // Query all the needed tiles from the DB
-        this._tileImagesStore.getBatch(tileImagesToQueryArray, function(items){
-            // will be loading and saving a maximum of 8 tiles at a time
-            self._myQueue = queue(8);
-            var i = 0;
-            self.fire('tilecachingstart', null);
-
-            self._nbTilesLeftToSave = 0;
-            items.forEach(function (item){
-                if(!item){
-                    // that tile image is not present in the DB
-                    var key = tileImagesToQueryArray[i];
-                    var tileInfo = tileImagesToQuery[key];
-
-                    self._nbTilesLeftToSave++;
-
-                    // that call will load the image from the map provider
-                    var makingAjaxCall = function(url, callback, error, queueCallback){
-                        if(self._hasBeenCanceled){
-                            queueCallback();
-                            return;
-                        }
-
-                        ajax(url, callback, error, queueCallback);
+        var completed = 0;
+        var iterate = function () {
+            iterator(arr[completed], function (err) {
+                if (err) {
+                    callback(err);
+                    callback = function () {};
+                }
+                else {
+                    completed += 1;
+                    if (completed >= arr.length) {
+                        callback();
                     }
-
-                    var imageUrl = self._createURL(tileInfo.x, tileInfo.y, tileInfo.z);
-
-                    // when the image is received, it is stored inside the DB using Base64 format
-                    var gettingImage = function (response) {
-                        self._tileImagesStore.put(key, {"image": arrayBufferToBase64ImagePNG(response)});
-                        self._decrementNbTilesLeftToSave();
+                    else {
+                        iterate();
                     }
+                }
+            });
+        };
+        iterate();
+    };
+    async.forEachSeries = async.eachSeries;
 
-                    var errorGettingImage = function (errorType, errorData){
-                        self._incrementNbTilesWithError();
-                        self._decrementNbTilesLeftToSave();
-                        self._reportError(errorType, errorData, imageUrl);
-                    };
+    async.eachLimit = function (arr, limit, iterator, callback) {
+        var fn = _eachLimit(limit);
+        fn.apply(null, [arr, iterator, callback]);
+    };
+    async.forEachLimit = async.eachLimit;
 
-                    // using queue-async to limit the number of simultaneous ajax calls
-                    self._myQueue.defer(makingAjaxCall, imageUrl,
-                                        gettingImage, errorGettingImage);
+    var _eachLimit = function (limit) {
+
+        return function (arr, iterator, callback) {
+            callback = callback || function () {};
+            if (!arr.length || limit <= 0) {
+                return callback();
+            }
+            var completed = 0;
+            var started = 0;
+            var running = 0;
+
+            (function replenish () {
+                if (completed >= arr.length) {
+                    return callback();
                 }
 
-                i++;
-            });
-
-            self._updateTotalNbImagesLeftToSave(self._nbTilesLeftToSave);
-
-            // wait for all tiles to be saved or found in the DB
-            self._myQueue.awaitAll(function(error, data) {
-                self._hasBeenCanceled = false;
-                self._myQueue = null;
-                self.fire('tilecachingprogressdone', null);
-            });
-        }, this._onBatchQueryError, 'dense' /* using dense returns undefined for each entry not present in the DB */);
-    },
-
-    _getZoomedInTiles: function(x, y, currentZ, maxZ, tileImagesToQuery, minY, maxY, minX, maxX){
-        this._getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, true);
-
-        if(currentZ < maxZ){
-            // getting the 4 tile under the current tile
-            minY *= 2;
-            maxY *= 2;
-            minX *= 2;
-            maxX *= 2;
-            this._getZoomedInTiles(x * 2, y * 2, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
-            this._getZoomedInTiles(x * 2 + 1, y * 2, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
-            this._getZoomedInTiles(x * 2, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
-            this._getZoomedInTiles(x * 2 + 1, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
-        }
-    },
-
-    _getZoomedOutTiles: function(x, y, currentZ, finalZ, tileImagesToQuery, minY, maxY, minX, maxX){
-        this._getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, false);
-
-        if(currentZ > finalZ){
-            minY /= 2;
-            maxY /= 2;
-            minX /= 2;
-            maxX /= 2;
-            // getting the zoomed out tile containing this tile
-            this._getZoomedOutTiles(Math.floor(x / 2), Math.floor(y / 2), currentZ - 1, finalZ, tileImagesToQuery,
-                                    minY, maxY, minX, maxX);
-        }
-    },
-
-    _getTileImage: function(x, y, z, tileImagesToQuery, minY, maxY, minX, maxX){
-        // is the tile outside the bounds?
-        if(x < Math.floor(minX) || x > Math.floor(maxX) || y < Math.floor(minY) || y > Math.floor(maxY)){
-            return;
-        }
-
-        // At this point, we only add the image to a "dictionary"
-        // This is being done to avoid multiple requests when zooming out, since zooming int should never overlap
-        var key = this._createTileKey(x, y, z);
-        if(!tileImagesToQuery[key]){
-            tileImagesToQuery[key] = {key:key, x: x, y: y, z: z};
-        }
-    },
-
-    _onBatchQueryError: function(errorData){
-        this._reportError("INDEXED_DB_BATCH", errorData);
-    },
-
-    _createNormalizedTilePoint: function(x, y, z){
-        var nbTilesAtZoomLevel = Math.pow(2, z);
-
-        while(x > nbTilesAtZoomLevel){
-            x -= nbTilesAtZoomLevel;
-        }
-        while(x < 0){
-            x += nbTilesAtZoomLevel;
-        }
-
-        while(y > nbTilesAtZoomLevel){
-            y -= nbTilesAtZoomLevel;
-        }
-        while(y < 0){
-            y += nbTilesAtZoomLevel;
-        }
-        return {x: x, y: y, z: z};
-    },
-
-    _createURL: function(x, y, z){
-        var tilePoint = this._createNormalizedTilePoint(x, y, z);
-
-        return this.getTileUrl(tilePoint);
-    },
-
-    _createTileKey: function(x, y, z){
-        var tilePoint = this._createNormalizedTilePoint(x, y, z);
-
-        return tilePoint.x + ", " + tilePoint.y + ", " + tilePoint.z;
-    }
-});
-module.exports.OfflineLayer = OfflineLayer;
-
-OfflineProgressControl = L.Control.extend({
-    options: {
-        position: 'topright'
-    },
-
-    onAdd: function (map) {
-        var controls = L.DomUtil.create('div', 'offlinemap-controls', this._container);
-        controls.setAttribute('id', 'offlinemap-controls');
-
-        this._counter = L.DomUtil.create('div', 'offlinemap-controls-counter', controls);
-        this._counter.setAttribute('id', 'offlinemap-controls-counter');
-        this._counter.innerHTML = "Ready";
-
-        var cancelButton = L.DomUtil.create('input', 'offlinemap-controls-cancel-button', controls);
-        cancelButton.setAttribute('type', "button");
-        cancelButton.setAttribute('id', "cancelBtn");
-        cancelButton.setAttribute('value', "Cancel");
-
-        L.DomEvent.addListener(cancelButton, 'click', this.onCancelClick, this);
-        L.DomEvent.disableClickPropagation(cancelButton);
-
-        return controls;
-    },
-
-    onProgressStart: function(){
-        // Tiles will get downloaded and probably cached while we are still looking at the result from the DB
-        // To avoid any weird display, we set _evaluating to false and display nothing until the total nb tiles
-        // is known.
-        this._evaluating = true;
-        this._counter.innerHTML = "...";
-    },
-
-    onProgressDone: function(){
-        this._counter.innerHTML = "Ready";
-    },
-
-    updateTotalNbTilesLeftToSave: function (event){
-        this._evaluating = false;
-        this._nbTilesToSave = event.nbTiles;
-        this.updateNbTilesLeftToSave(event);
-    },
-
-    updateNbTilesLeftToSave: function (event){
-        if(!this._evaluating){
-            if(this._nbTilesToSave == 0){
-                this._counter.innerHTML = "100%";
-            }
-            else{
-                this._counter.innerHTML = Math.floor((this._nbTilesToSave - event.nbTiles) / this._nbTilesToSave * 100) + "%";
-            }
-        }
-    },
-
-    onCancelClick: function (){
-        if(this._offlineLayer.cancel()){
-            this._counter.innerHTML = "Canceling...";
+                while (running < limit && started < arr.length) {
+                    started += 1;
+                    running += 1;
+                    iterator(arr[started - 1], function (err) {
+                        if (err) {
+                            callback(err);
+                            callback = function () {};
+                        }
+                        else {
+                            completed += 1;
+                            running -= 1;
+                            if (completed >= arr.length) {
+                                callback();
+                            }
+                            else {
+                                replenish();
+                            }
+                        }
+                    });
+                }
+            })();
         };
-    },
+    };
 
-    setOfflineLayer: function (offlineLayer){
-        this._offlineLayer = offlineLayer;
-        this._offlineLayer.on('tilecachingstart', this.onProgressStart, this);
-        this._offlineLayer.on('tilecachingprogressstart', this.updateTotalNbTilesLeftToSave, this);
-        this._offlineLayer.on('tilecachingprogress', this.updateNbTilesLeftToSave, this);
-        this._offlineLayer.on('tilecachingprogressdone', this.onProgressDone, this);
 
+    var doParallel = function (fn) {
+        return function () {
+            var args = Array.prototype.slice.call(arguments);
+            return fn.apply(null, [async.each].concat(args));
+        };
+    };
+    var doParallelLimit = function(limit, fn) {
+        return function () {
+            var args = Array.prototype.slice.call(arguments);
+            return fn.apply(null, [_eachLimit(limit)].concat(args));
+        };
+    };
+    var doSeries = function (fn) {
+        return function () {
+            var args = Array.prototype.slice.call(arguments);
+            return fn.apply(null, [async.eachSeries].concat(args));
+        };
+    };
+
+
+    var _asyncMap = function (eachfn, arr, iterator, callback) {
+        arr = _map(arr, function (x, i) {
+            return {index: i, value: x};
+        });
+        if (!callback) {
+            eachfn(arr, function (x, callback) {
+                iterator(x.value, function (err) {
+                    callback(err);
+                });
+            });
+        } else {
+            var results = [];
+            eachfn(arr, function (x, callback) {
+                iterator(x.value, function (err, v) {
+                    results[x.index] = v;
+                    callback(err);
+                });
+            }, function (err) {
+                callback(err, results);
+            });
+        }
+    };
+    async.map = doParallel(_asyncMap);
+    async.mapSeries = doSeries(_asyncMap);
+    async.mapLimit = function (arr, limit, iterator, callback) {
+        return _mapLimit(limit)(arr, iterator, callback);
+    };
+
+    var _mapLimit = function(limit) {
+        return doParallelLimit(limit, _asyncMap);
+    };
+
+    // reduce only has a series version, as doing reduce in parallel won't
+    // work in many situations.
+    async.reduce = function (arr, memo, iterator, callback) {
+        async.eachSeries(arr, function (x, callback) {
+            iterator(memo, x, function (err, v) {
+                memo = v;
+                callback(err);
+            });
+        }, function (err) {
+            callback(err, memo);
+        });
+    };
+    // inject alias
+    async.inject = async.reduce;
+    // foldl alias
+    async.foldl = async.reduce;
+
+    async.reduceRight = function (arr, memo, iterator, callback) {
+        var reversed = _map(arr, function (x) {
+            return x;
+        }).reverse();
+        async.reduce(reversed, memo, iterator, callback);
+    };
+    // foldr alias
+    async.foldr = async.reduceRight;
+
+    var _filter = function (eachfn, arr, iterator, callback) {
+        var results = [];
+        arr = _map(arr, function (x, i) {
+            return {index: i, value: x};
+        });
+        eachfn(arr, function (x, callback) {
+            iterator(x.value, function (v) {
+                if (v) {
+                    results.push(x);
+                }
+                callback();
+            });
+        }, function (err) {
+            callback(_map(results.sort(function (a, b) {
+                return a.index - b.index;
+            }), function (x) {
+                return x.value;
+            }));
+        });
+    };
+    async.filter = doParallel(_filter);
+    async.filterSeries = doSeries(_filter);
+    // select alias
+    async.select = async.filter;
+    async.selectSeries = async.filterSeries;
+
+    var _reject = function (eachfn, arr, iterator, callback) {
+        var results = [];
+        arr = _map(arr, function (x, i) {
+            return {index: i, value: x};
+        });
+        eachfn(arr, function (x, callback) {
+            iterator(x.value, function (v) {
+                if (!v) {
+                    results.push(x);
+                }
+                callback();
+            });
+        }, function (err) {
+            callback(_map(results.sort(function (a, b) {
+                return a.index - b.index;
+            }), function (x) {
+                return x.value;
+            }));
+        });
+    };
+    async.reject = doParallel(_reject);
+    async.rejectSeries = doSeries(_reject);
+
+    var _detect = function (eachfn, arr, iterator, main_callback) {
+        eachfn(arr, function (x, callback) {
+            iterator(x, function (result) {
+                if (result) {
+                    main_callback(x);
+                    main_callback = function () {};
+                }
+                else {
+                    callback();
+                }
+            });
+        }, function (err) {
+            main_callback();
+        });
+    };
+    async.detect = doParallel(_detect);
+    async.detectSeries = doSeries(_detect);
+
+    async.some = function (arr, iterator, main_callback) {
+        async.each(arr, function (x, callback) {
+            iterator(x, function (v) {
+                if (v) {
+                    main_callback(true);
+                    main_callback = function () {};
+                }
+                callback();
+            });
+        }, function (err) {
+            main_callback(false);
+        });
+    };
+    // any alias
+    async.any = async.some;
+
+    async.every = function (arr, iterator, main_callback) {
+        async.each(arr, function (x, callback) {
+            iterator(x, function (v) {
+                if (!v) {
+                    main_callback(false);
+                    main_callback = function () {};
+                }
+                callback();
+            });
+        }, function (err) {
+            main_callback(true);
+        });
+    };
+    // all alias
+    async.all = async.every;
+
+    async.sortBy = function (arr, iterator, callback) {
+        async.map(arr, function (x, callback) {
+            iterator(x, function (err, criteria) {
+                if (err) {
+                    callback(err);
+                }
+                else {
+                    callback(null, {value: x, criteria: criteria});
+                }
+            });
+        }, function (err, results) {
+            if (err) {
+                return callback(err);
+            }
+            else {
+                var fn = function (left, right) {
+                    var a = left.criteria, b = right.criteria;
+                    return a < b ? -1 : a > b ? 1 : 0;
+                };
+                callback(null, _map(results.sort(fn), function (x) {
+                    return x.value;
+                }));
+            }
+        });
+    };
+
+    async.auto = function (tasks, callback) {
+        callback = callback || function () {};
+        var keys = _keys(tasks);
+        var remainingTasks = keys.length
+        if (!remainingTasks) {
+            return callback();
+        }
+
+        var results = {};
+
+        var listeners = [];
+        var addListener = function (fn) {
+            listeners.unshift(fn);
+        };
+        var removeListener = function (fn) {
+            for (var i = 0; i < listeners.length; i += 1) {
+                if (listeners[i] === fn) {
+                    listeners.splice(i, 1);
+                    return;
+                }
+            }
+        };
+        var taskComplete = function () {
+            remainingTasks--
+            _each(listeners.slice(0), function (fn) {
+                fn();
+            });
+        };
+
+        addListener(function () {
+            if (!remainingTasks) {
+                var theCallback = callback;
+                // prevent final callback from calling itself if it errors
+                callback = function () {};
+
+                theCallback(null, results);
+            }
+        });
+
+        _each(keys, function (k) {
+            var task = _isArray(tasks[k]) ? tasks[k]: [tasks[k]];
+            var taskCallback = function (err) {
+                var args = Array.prototype.slice.call(arguments, 1);
+                if (args.length <= 1) {
+                    args = args[0];
+                }
+                if (err) {
+                    var safeResults = {};
+                    _each(_keys(results), function(rkey) {
+                        safeResults[rkey] = results[rkey];
+                    });
+                    safeResults[k] = args;
+                    callback(err, safeResults);
+                    // stop subsequent errors hitting callback multiple times
+                    callback = function () {};
+                }
+                else {
+                    results[k] = args;
+                    async.setImmediate(taskComplete);
+                }
+            };
+            var requires = task.slice(0, Math.abs(task.length - 1)) || [];
+            var ready = function () {
+                return _reduce(requires, function (a, x) {
+                    return (a && results.hasOwnProperty(x));
+                }, true) && !results.hasOwnProperty(k);
+            };
+            if (ready()) {
+                task[task.length - 1](taskCallback, results);
+            }
+            else {
+                var listener = function () {
+                    if (ready()) {
+                        removeListener(listener);
+                        task[task.length - 1](taskCallback, results);
+                    }
+                };
+                addListener(listener);
+            }
+        });
+    };
+
+    async.retry = function(times, task, callback) {
+        var DEFAULT_TIMES = 5;
+        var attempts = [];
+        // Use defaults if times not passed
+        if (typeof times === 'function') {
+            callback = task;
+            task = times;
+            times = DEFAULT_TIMES;
+        }
+        // Make sure times is a number
+        times = parseInt(times, 10) || DEFAULT_TIMES;
+        var wrappedTask = function(wrappedCallback, wrappedResults) {
+            var retryAttempt = function(task, finalAttempt) {
+                return function(seriesCallback) {
+                    task(function(err, result){
+                        seriesCallback(!err || finalAttempt, {err: err, result: result});
+                    }, wrappedResults);
+                };
+            };
+            while (times) {
+                attempts.push(retryAttempt(task, !(times-=1)));
+            }
+            async.series(attempts, function(done, data){
+                data = data[data.length - 1];
+                (wrappedCallback || callback)(data.err, data.result);
+            });
+        }
+        // If a callback is passed, run this as a controll flow
+        return callback ? wrappedTask() : wrappedTask
+    };
+
+    async.waterfall = function (tasks, callback) {
+        callback = callback || function () {};
+        if (!_isArray(tasks)) {
+          var err = new Error('First argument to waterfall must be an array of functions');
+          return callback(err);
+        }
+        if (!tasks.length) {
+            return callback();
+        }
+        var wrapIterator = function (iterator) {
+            return function (err) {
+                if (err) {
+                    callback.apply(null, arguments);
+                    callback = function () {};
+                }
+                else {
+                    var args = Array.prototype.slice.call(arguments, 1);
+                    var next = iterator.next();
+                    if (next) {
+                        args.push(wrapIterator(next));
+                    }
+                    else {
+                        args.push(callback);
+                    }
+                    async.setImmediate(function () {
+                        iterator.apply(null, args);
+                    });
+                }
+            };
+        };
+        wrapIterator(async.iterator(tasks))();
+    };
+
+    var _parallel = function(eachfn, tasks, callback) {
+        callback = callback || function () {};
+        if (_isArray(tasks)) {
+            eachfn.map(tasks, function (fn, callback) {
+                if (fn) {
+                    fn(function (err) {
+                        var args = Array.prototype.slice.call(arguments, 1);
+                        if (args.length <= 1) {
+                            args = args[0];
+                        }
+                        callback.call(null, err, args);
+                    });
+                }
+            }, callback);
+        }
+        else {
+            var results = {};
+            eachfn.each(_keys(tasks), function (k, callback) {
+                tasks[k](function (err) {
+                    var args = Array.prototype.slice.call(arguments, 1);
+                    if (args.length <= 1) {
+                        args = args[0];
+                    }
+                    results[k] = args;
+                    callback(err);
+                });
+            }, function (err) {
+                callback(err, results);
+            });
+        }
+    };
+
+    async.parallel = function (tasks, callback) {
+        _parallel({ map: async.map, each: async.each }, tasks, callback);
+    };
+
+    async.parallelLimit = function(tasks, limit, callback) {
+        _parallel({ map: _mapLimit(limit), each: _eachLimit(limit) }, tasks, callback);
+    };
+
+    async.series = function (tasks, callback) {
+        callback = callback || function () {};
+        if (_isArray(tasks)) {
+            async.mapSeries(tasks, function (fn, callback) {
+                if (fn) {
+                    fn(function (err) {
+                        var args = Array.prototype.slice.call(arguments, 1);
+                        if (args.length <= 1) {
+                            args = args[0];
+                        }
+                        callback.call(null, err, args);
+                    });
+                }
+            }, callback);
+        }
+        else {
+            var results = {};
+            async.eachSeries(_keys(tasks), function (k, callback) {
+                tasks[k](function (err) {
+                    var args = Array.prototype.slice.call(arguments, 1);
+                    if (args.length <= 1) {
+                        args = args[0];
+                    }
+                    results[k] = args;
+                    callback(err);
+                });
+            }, function (err) {
+                callback(err, results);
+            });
+        }
+    };
+
+    async.iterator = function (tasks) {
+        var makeCallback = function (index) {
+            var fn = function () {
+                if (tasks.length) {
+                    tasks[index].apply(null, arguments);
+                }
+                return fn.next();
+            };
+            fn.next = function () {
+                return (index < tasks.length - 1) ? makeCallback(index + 1): null;
+            };
+            return fn;
+        };
+        return makeCallback(0);
+    };
+
+    async.apply = function (fn) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        return function () {
+            return fn.apply(
+                null, args.concat(Array.prototype.slice.call(arguments))
+            );
+        };
+    };
+
+    var _concat = function (eachfn, arr, fn, callback) {
+        var r = [];
+        eachfn(arr, function (x, cb) {
+            fn(x, function (err, y) {
+                r = r.concat(y || []);
+                cb(err);
+            });
+        }, function (err) {
+            callback(err, r);
+        });
+    };
+    async.concat = doParallel(_concat);
+    async.concatSeries = doSeries(_concat);
+
+    async.whilst = function (test, iterator, callback) {
+        if (test()) {
+            iterator(function (err) {
+                if (err) {
+                    return callback(err);
+                }
+                async.whilst(test, iterator, callback);
+            });
+        }
+        else {
+            callback();
+        }
+    };
+
+    async.doWhilst = function (iterator, test, callback) {
+        iterator(function (err) {
+            if (err) {
+                return callback(err);
+            }
+            var args = Array.prototype.slice.call(arguments, 1);
+            if (test.apply(null, args)) {
+                async.doWhilst(iterator, test, callback);
+            }
+            else {
+                callback();
+            }
+        });
+    };
+
+    async.until = function (test, iterator, callback) {
+        if (!test()) {
+            iterator(function (err) {
+                if (err) {
+                    return callback(err);
+                }
+                async.until(test, iterator, callback);
+            });
+        }
+        else {
+            callback();
+        }
+    };
+
+    async.doUntil = function (iterator, test, callback) {
+        iterator(function (err) {
+            if (err) {
+                return callback(err);
+            }
+            var args = Array.prototype.slice.call(arguments, 1);
+            if (!test.apply(null, args)) {
+                async.doUntil(iterator, test, callback);
+            }
+            else {
+                callback();
+            }
+        });
+    };
+
+    async.queue = function (worker, concurrency) {
+        if (concurrency === undefined) {
+            concurrency = 1;
+        }
+        function _insert(q, data, pos, callback) {
+          if (!q.started){
+            q.started = true;
+          }
+          if (!_isArray(data)) {
+              data = [data];
+          }
+          if(data.length == 0) {
+             // call drain immediately if there are no tasks
+             return async.setImmediate(function() {
+                 if (q.drain) {
+                     q.drain();
+                 }
+             });
+          }
+          _each(data, function(task) {
+              var item = {
+                  data: task,
+                  callback: typeof callback === 'function' ? callback : null
+              };
+
+              if (pos) {
+                q.tasks.unshift(item);
+              } else {
+                q.tasks.push(item);
+              }
+
+              if (q.saturated && q.tasks.length === q.concurrency) {
+                  q.saturated();
+              }
+              async.setImmediate(q.process);
+          });
+        }
+
+        var workers = 0;
+        var q = {
+            tasks: [],
+            concurrency: concurrency,
+            saturated: null,
+            empty: null,
+            drain: null,
+            started: false,
+            paused: false,
+            push: function (data, callback) {
+              _insert(q, data, false, callback);
+            },
+            kill: function () {
+              q.drain = null;
+              q.tasks = [];
+            },
+            unshift: function (data, callback) {
+              _insert(q, data, true, callback);
+            },
+            process: function () {
+                if (!q.paused && workers < q.concurrency && q.tasks.length) {
+                    var task = q.tasks.shift();
+                    if (q.empty && q.tasks.length === 0) {
+                        q.empty();
+                    }
+                    workers += 1;
+                    var next = function () {
+                        workers -= 1;
+                        if (task.callback) {
+                            task.callback.apply(task, arguments);
+                        }
+                        if (q.drain && q.tasks.length + workers === 0) {
+                            q.drain();
+                        }
+                        q.process();
+                    };
+                    var cb = only_once(next);
+                    worker(task.data, cb);
+                }
+            },
+            length: function () {
+                return q.tasks.length;
+            },
+            running: function () {
+                return workers;
+            },
+            idle: function() {
+                return q.tasks.length + workers === 0;
+            },
+            pause: function () {
+                if (q.paused === true) { return; }
+                q.paused = true;
+                q.process();
+            },
+            resume: function () {
+                if (q.paused === false) { return; }
+                q.paused = false;
+                q.process();
+            }
+        };
+        return q;
+    };
+    
+    async.priorityQueue = function (worker, concurrency) {
+        
+        function _compareTasks(a, b){
+          return a.priority - b.priority;
+        };
+        
+        function _binarySearch(sequence, item, compare) {
+          var beg = -1,
+              end = sequence.length - 1;
+          while (beg < end) {
+            var mid = beg + ((end - beg + 1) >>> 1);
+            if (compare(item, sequence[mid]) >= 0) {
+              beg = mid;
+            } else {
+              end = mid - 1;
+            }
+          }
+          return beg;
+        }
+        
+        function _insert(q, data, priority, callback) {
+          if (!q.started){
+            q.started = true;
+          }
+          if (!_isArray(data)) {
+              data = [data];
+          }
+          if(data.length == 0) {
+             // call drain immediately if there are no tasks
+             return async.setImmediate(function() {
+                 if (q.drain) {
+                     q.drain();
+                 }
+             });
+          }
+          _each(data, function(task) {
+              var item = {
+                  data: task,
+                  priority: priority,
+                  callback: typeof callback === 'function' ? callback : null
+              };
+              
+              q.tasks.splice(_binarySearch(q.tasks, item, _compareTasks) + 1, 0, item);
+
+              if (q.saturated && q.tasks.length === q.concurrency) {
+                  q.saturated();
+              }
+              async.setImmediate(q.process);
+          });
+        }
+        
+        // Start with a normal queue
+        var q = async.queue(worker, concurrency);
+        
+        // Override push to accept second parameter representing priority
+        q.push = function (data, priority, callback) {
+          _insert(q, data, priority, callback);
+        };
+        
+        // Remove unshift function
+        delete q.unshift;
+
+        return q;
+    };
+
+    async.cargo = function (worker, payload) {
+        var working     = false,
+            tasks       = [];
+
+        var cargo = {
+            tasks: tasks,
+            payload: payload,
+            saturated: null,
+            empty: null,
+            drain: null,
+            drained: true,
+            push: function (data, callback) {
+                if (!_isArray(data)) {
+                    data = [data];
+                }
+                _each(data, function(task) {
+                    tasks.push({
+                        data: task,
+                        callback: typeof callback === 'function' ? callback : null
+                    });
+                    cargo.drained = false;
+                    if (cargo.saturated && tasks.length === payload) {
+                        cargo.saturated();
+                    }
+                });
+                async.setImmediate(cargo.process);
+            },
+            process: function process() {
+                if (working) return;
+                if (tasks.length === 0) {
+                    if(cargo.drain && !cargo.drained) cargo.drain();
+                    cargo.drained = true;
+                    return;
+                }
+
+                var ts = typeof payload === 'number'
+                            ? tasks.splice(0, payload)
+                            : tasks.splice(0, tasks.length);
+
+                var ds = _map(ts, function (task) {
+                    return task.data;
+                });
+
+                if(cargo.empty) cargo.empty();
+                working = true;
+                worker(ds, function () {
+                    working = false;
+
+                    var args = arguments;
+                    _each(ts, function (data) {
+                        if (data.callback) {
+                            data.callback.apply(null, args);
+                        }
+                    });
+
+                    process();
+                });
+            },
+            length: function () {
+                return tasks.length;
+            },
+            running: function () {
+                return working;
+            }
+        };
+        return cargo;
+    };
+
+    var _console_fn = function (name) {
+        return function (fn) {
+            var args = Array.prototype.slice.call(arguments, 1);
+            fn.apply(null, args.concat([function (err) {
+                var args = Array.prototype.slice.call(arguments, 1);
+                if (typeof console !== 'undefined') {
+                    if (err) {
+                        if (console.error) {
+                            console.error(err);
+                        }
+                    }
+                    else if (console[name]) {
+                        _each(args, function (x) {
+                            console[name](x);
+                        });
+                    }
+                }
+            }]));
+        };
+    };
+    async.log = _console_fn('log');
+    async.dir = _console_fn('dir');
+    /*async.info = _console_fn('info');
+    async.warn = _console_fn('warn');
+    async.error = _console_fn('error');*/
+
+    async.memoize = function (fn, hasher) {
+        var memo = {};
+        var queues = {};
+        hasher = hasher || function (x) {
+            return x;
+        };
+        var memoized = function () {
+            var args = Array.prototype.slice.call(arguments);
+            var callback = args.pop();
+            var key = hasher.apply(null, args);
+            if (key in memo) {
+                async.nextTick(function () {
+                    callback.apply(null, memo[key]);
+                });
+            }
+            else if (key in queues) {
+                queues[key].push(callback);
+            }
+            else {
+                queues[key] = [callback];
+                fn.apply(null, args.concat([function () {
+                    memo[key] = arguments;
+                    var q = queues[key];
+                    delete queues[key];
+                    for (var i = 0, l = q.length; i < l; i++) {
+                      q[i].apply(null, arguments);
+                    }
+                }]));
+            }
+        };
+        memoized.memo = memo;
+        memoized.unmemoized = fn;
+        return memoized;
+    };
+
+    async.unmemoize = function (fn) {
+      return function () {
+        return (fn.unmemoized || fn).apply(null, arguments);
+      };
+    };
+
+    async.times = function (count, iterator, callback) {
+        var counter = [];
+        for (var i = 0; i < count; i++) {
+            counter.push(i);
+        }
+        return async.map(counter, iterator, callback);
+    };
+
+    async.timesSeries = function (count, iterator, callback) {
+        var counter = [];
+        for (var i = 0; i < count; i++) {
+            counter.push(i);
+        }
+        return async.mapSeries(counter, iterator, callback);
+    };
+
+    async.seq = function (/* functions... */) {
+        var fns = arguments;
+        return function () {
+            var that = this;
+            var args = Array.prototype.slice.call(arguments);
+            var callback = args.pop();
+            async.reduce(fns, args, function (newargs, fn, cb) {
+                fn.apply(that, newargs.concat([function () {
+                    var err = arguments[0];
+                    var nextargs = Array.prototype.slice.call(arguments, 1);
+                    cb(err, nextargs);
+                }]))
+            },
+            function (err, results) {
+                callback.apply(that, [err].concat(results));
+            });
+        };
+    };
+
+    async.compose = function (/* functions... */) {
+      return async.seq.apply(null, Array.prototype.reverse.call(arguments));
+    };
+
+    var _applyEach = function (eachfn, fns /*args...*/) {
+        var go = function () {
+            var that = this;
+            var args = Array.prototype.slice.call(arguments);
+            var callback = args.pop();
+            return eachfn(fns, function (fn, cb) {
+                fn.apply(that, args.concat([cb]));
+            },
+            callback);
+        };
+        if (arguments.length > 2) {
+            var args = Array.prototype.slice.call(arguments, 2);
+            return go.apply(this, args);
+        }
+        else {
+            return go;
+        }
+    };
+    async.applyEach = doParallel(_applyEach);
+    async.applyEachSeries = doSeries(_applyEach);
+
+    async.forever = function (fn, callback) {
+        function next(err) {
+            if (err) {
+                if (callback) {
+                    return callback(err);
+                }
+                throw err;
+            }
+            fn(next);
+        }
+        next();
+    };
+
+    // Node.js
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = async;
     }
-});
-module.exports.OfflineProgressControl = OfflineProgressControl;
+    // AMD / RequireJS
+    else if (typeof define !== 'undefined' && define.amd) {
+        define([], function () {
+            return async;
+        });
+    }
+    // included directly via <script> tag
+    else {
+        root.async = async;
+    }
 
-// The following code was taken from https://github.com/tbicr/OfflineMap
-// under the MIT License (MIT)
-/*
- The MIT License (MIT)
+}());
 
- Copyright (c) <year> <copyright holders>
+}).call(this,require("/home/clayton/dev/mWater/offline-leaflet-map/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
+},{"/home/clayton/dev/mWater/offline-leaflet-map/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":2}],2:[function(require,module,exports){
+// shim for using process in browser
 
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
+var process = module.exports = {};
 
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
+process.nextTick = (function () {
+    var canSetImmediate = typeof window !== 'undefined'
+    && window.setImmediate;
+    var canPost = typeof window !== 'undefined'
+    && window.postMessage && window.addEventListener
+    ;
 
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
- */
+    if (canSetImmediate) {
+        return function (f) { return window.setImmediate(f) };
+    }
 
-function ajax(url, callback, error, queueCallback) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.responseType = 'arraybuffer';
-    xhr.onload = function(err) {
-        if (this.status == 200) {
-            callback(this.response);
-        }
-        else{
-            error("GET_STATUS_ERROR", err);
-        }
-        queueCallback();
+    if (canPost) {
+        var queue = [];
+        window.addEventListener('message', function (ev) {
+            var source = ev.source;
+            if ((source === window || source === null) && ev.data === 'process-tick') {
+                ev.stopPropagation();
+                if (queue.length > 0) {
+                    var fn = queue.shift();
+                    fn();
+                }
+            }
+        }, true);
+
+        return function nextTick(fn) {
+            queue.push(fn);
+            window.postMessage('process-tick', '*');
+        };
+    }
+
+    return function nextTick(fn) {
+        setTimeout(fn, 0);
     };
-    xhr.onerror = function(errorMsg) {
-      error("NETWORK_ERROR", errorMsg);
-      queueCallback();
-    };
-    xhr.send();
+})();
+
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+
+function noop() {}
+
+process.on = noop;
+process.once = noop;
+process.off = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
 }
 
-/*
- Probably btoa can work incorrect, you can override btoa with next example:
- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Solution_.232_.E2.80.93_rewriting_atob%28%29_and_btoa%28%29_using_TypedArrays_and_UTF-8
- */
-function arrayBufferToBase64ImagePNG(buffer) {
-    var binary = '';
-    var bytes = new Uint8Array(buffer);
-    for (var i = 0, l = bytes.byteLength; i < l; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return 'data:image/png;base64,' + btoa(binary);
-}
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
 
-},{"idb-wrapper":2,"queue-async":3}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 /*global window:false, self:false, define:false, module:false */
 
 /**
@@ -1692,86 +2407,803 @@ function arrayBufferToBase64ImagePNG(buffer) {
 
 }, this);
 
-},{}],3:[function(require,module,exports){
-(function() {
-  var slice = [].slice;
+},{}],4:[function(require,module,exports){
+var ImageRetriever, ajax, arrayBufferToBase64ImagePNG;
 
-  function queue(parallelism) {
-    var q,
-        tasks = [],
-        started = 0, // number of tasks that have been started (and perhaps finished)
-        active = 0, // number of tasks currently being executed (started but not finished)
-        remaining = 0, // number of tasks not yet finished
-        popping, // inside a synchronous task callback?
-        error = null,
-        await = noop,
-        all;
-
-    if (!parallelism) parallelism = Infinity;
-
-    function pop() {
-      while (popping = started < tasks.length && active < parallelism) {
-        var i = started++,
-            t = tasks[i],
-            a = slice.call(t, 1);
-        a.push(callback(i));
-        ++active;
-        t[0].apply(null, a);
-      }
-    }
-
-    function callback(i) {
-      return function(e, r) {
-        --active;
-        if (error != null) return;
-        if (e != null) {
-          error = e; // ignore new tasks and squelch active callbacks
-          started = remaining = NaN; // stop queued tasks from starting
-          notify();
-        } else {
-          tasks[i] = r;
-          if (--remaining) popping || pop();
-          else notify();
-        }
-      };
-    }
-
-    function notify() {
-      if (error != null) await(error);
-      else if (all) await(error, tasks);
-      else await.apply(null, [error].concat(tasks));
-    }
-
-    return q = {
-      defer: function() {
-        if (!error) {
-          tasks.push(arguments);
-          ++remaining;
-          pop();
-        }
-        return q;
-      },
-      await: function(f) {
-        await = f;
-        all = false;
-        if (!remaining) notify();
-        return q;
-      },
-      awaitAll: function(f) {
-        await = f;
-        all = true;
-        if (!remaining) notify();
-        return q;
-      }
-    };
+module.exports = ImageRetriever = (function() {
+  function ImageRetriever(offlineLayer) {
+    this.offlineLayer = offlineLayer;
   }
 
-  function noop() {}
+  ImageRetriever.prototype.retrieveImage = function(tileInfo, callback, error) {
+    var imageUrl;
+    imageUrl = this.offlineLayer._createURL(tileInfo.x, tileInfo.y, tileInfo.z);
+    return ajax(imageUrl, function(response) {
+      return callback(arrayBufferToBase64ImagePNG(response));
+    }, error);
+  };
 
-  queue.version = "1.0.7";
-  if (typeof define === "function" && define.amd) define(function() { return queue; });
-  else if (typeof module === "object" && module.exports) module.exports = queue;
-  else this.queue = queue;
+  return ImageRetriever;
+
 })();
 
-},{}]},{},[1]);
+
+/*
+ The MIT License (MIT)
+
+ Copyright (c) <year> <copyright holders>
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+ */
+
+ajax = function(url, callback, error, queueCallback) {
+  var xhr;
+  xhr = new XMLHttpRequest();
+  xhr.open('GET', url, true);
+  xhr.responseType = 'arraybuffer';
+  xhr.onload = function(err) {
+    if (this.status === 200) {
+      return callback(this.response);
+    } else {
+      return error("GET_STATUS_ERROR", err);
+    }
+  };
+  xhr.onerror = function(errorMsg) {
+    return error("NETWORK_ERROR", errorMsg);
+  };
+  return xhr.send();
+};
+
+
+/*
+Probably btoa can work incorrect, you can override btoa with next example:
+  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Solution_.232_.E2.80.93_rewriting_atob%28%29_and_btoa%28%29_using_TypedArrays_and_UTF-8
+ */
+
+arrayBufferToBase64ImagePNG = function(buffer) {
+  var binary, bytes, i, _i, _ref;
+  binary = '';
+  bytes = new Uint8Array(buffer);
+  for (i = _i = 0, _ref = bytes.byteLength; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return 'data:image/png;base64,' + btoa(binary);
+};
+
+
+},{}],5:[function(require,module,exports){
+var ImageStore, IndexedDBDataStorage, WebSQLDataStorage, async;
+
+async = require('async');
+
+IndexedDBDataStorage = require('./IndexedDBDataStorage');
+
+WebSQLDataStorage = require('./WebSQLDataStorage');
+
+module.exports = ImageStore = (function() {
+  function ImageStore(eventEmitter, imageRetriever) {
+    if (imageRetriever == null) {
+      throw new Error('the image store needs an imageRetriever');
+    }
+    if (eventEmitter == null) {
+      throw new Error('the image store needs an eventEmitter');
+    }
+    this._eventEmitter = eventEmitter;
+    this._nbTilesLeftToSave = 0;
+    this._nbImagesCurrentlyBeingRetrieved = 0;
+    this._imageRetriever = imageRetriever;
+    this._myQueue = null;
+    this._beingCanceled = false;
+    this._running = false;
+  }
+
+  ImageStore.prototype.createDB = function(storeName, onReady, onError, useWebSQL) {
+    var _useWebSQL;
+    _useWebSQL = useWebSQL;
+    if (onReady == null) {
+      throw new Error('This async function needs a callback');
+    }
+    if (!_useWebSQL) {
+      return this.storage = new IndexedDBDataStorage(storeName, onReady, onError);
+    } else {
+      return this.storage = new WebSQLDataStorage(storeName, onReady, onError);
+    }
+  };
+
+  ImageStore.prototype.cancel = function() {
+    if (!this._running) {
+      return false;
+    }
+    if (this._beingCanceled) {
+      return true;
+    }
+    this._beingCanceled = true;
+    if (this._myQueue != null) {
+      this._myQueue.kill();
+      if (this._nbImagesCurrentlyBeingRetrieved === 0) {
+        this._finish();
+      }
+      return true;
+    }
+    return false;
+  };
+
+  ImageStore.prototype.isBusy = function() {
+    return this._running;
+  };
+
+  ImageStore.prototype.get = function(key, onSuccess, onError) {
+    if ((onSuccess == null) || (onError == null)) {
+      throw new Error('This async function needs callbacks');
+    }
+    return this.storage.get(key, onSuccess, onError);
+  };
+
+  ImageStore.prototype.clear = function(onSuccess, onError) {
+    if ((onSuccess == null) || (onError == null)) {
+      throw new Error('This async function needs callbacks');
+    }
+    return this.storage.clear(onSuccess, onError);
+  };
+
+  ImageStore.prototype._finish = function(error, onError) {
+    this._running = false;
+    this._beingCanceled = false;
+    this._eventEmitter.fire('tilecachingprogressdone', null);
+    this._myQueue = null;
+    this._nbImagesCurrentlyBeingRetrieved = 0;
+    if (error != null) {
+      return onError(error);
+    } else {
+      return this._onSaveImagesSuccess();
+    }
+  };
+
+  ImageStore.prototype.saveImages = function(tileImagesToQuery, onStarted, onSuccess, onError) {
+    this._running = true;
+    if (this._myQueue != null) {
+      throw new Error('Not allowed to save images while saving is already in progress');
+    }
+    if ((onStarted == null) || (onSuccess == null) || (onError == null)) {
+      throw new Error('This async function needs callbacks');
+    }
+    this._onSaveImagesSuccess = onSuccess;
+    return this._getImagesNotInDB(tileImagesToQuery, (function(_this) {
+      return function(tileInfoOfImagesNotInDB) {
+        var MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY, data, _i, _len;
+        if (!_this._beingCanceled && (tileInfoOfImagesNotInDB != null) && tileInfoOfImagesNotInDB.length > 0) {
+          MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8;
+          _this._myQueue = async.queue(function(data, callback) {
+            return _this._saveTile(data, callback);
+          }, MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY);
+          _this._myQueue.drain = function(error) {
+            return _this._finish(error, onError);
+          };
+          for (_i = 0, _len = tileInfoOfImagesNotInDB.length; _i < _len; _i++) {
+            data = tileInfoOfImagesNotInDB[_i];
+            _this._myQueue.push(data);
+          }
+          return onStarted();
+        } else {
+          onStarted();
+          return _this._finish();
+        }
+      };
+    })(this), function(error) {
+      return onError(error);
+    });
+  };
+
+  ImageStore.prototype._getImagesNotInDB = function(tileImagesToQuery, callback, onError) {
+    var imageKey, tileImagesToQueryArray;
+    tileImagesToQueryArray = [];
+    for (imageKey in tileImagesToQuery) {
+      tileImagesToQueryArray.push(imageKey);
+    }
+    return this.storage.getDenseBatch(tileImagesToQueryArray, (function(_this) {
+      return function(tileImages) {
+        var i, testTile, tileImage, tileInfoOfImagesNotInDB, _i, _len;
+        i = 0;
+        tileInfoOfImagesNotInDB = [];
+        _this._eventEmitter.fire('tilecachingstart', null);
+        _this._nbTilesLeftToSave = 0;
+        testTile = function(tileImage) {
+          var key, tileInfo;
+          if (!tileImage) {
+            key = tileImagesToQueryArray[i];
+            tileInfo = tileImagesToQuery[key];
+            _this._nbTilesLeftToSave++;
+            tileInfoOfImagesNotInDB.push({
+              key: key,
+              tileInfo: tileInfo
+            });
+          }
+          return i++;
+        };
+        for (_i = 0, _len = tileImages.length; _i < _len; _i++) {
+          tileImage = tileImages[_i];
+          testTile(tileImage);
+        }
+        _this._updateTotalNbImagesLeftToSave(_this._nbTilesLeftToSave);
+        return callback(tileInfoOfImagesNotInDB);
+      };
+    })(this), function(error) {
+      return onError(error);
+    });
+  };
+
+  ImageStore.prototype._saveTile = function(data, callback) {
+    var errorGettingImage, gettingImage;
+    gettingImage = (function(_this) {
+      return function(response) {
+        return _this.storage.put(data.key, {
+          "image": response
+        }, function() {
+          _this._decrementNbTilesLeftToSave();
+          return callback();
+        }, function(error) {
+          _this._decrementNbTilesLeftToSave();
+          return callback(error);
+        });
+      };
+    })(this);
+    errorGettingImage = (function(_this) {
+      return function(errorType, errorData) {
+        _this._decrementNbTilesLeftToSave();
+        _this._eventEmitter._reportError(errorType, {
+          data: errorData,
+          tileInfo: data.tileInfo
+        });
+        return callback(errorType);
+      };
+    })(this);
+    this._nbImagesCurrentlyBeingRetrieved++;
+    return this._imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage);
+  };
+
+  ImageStore.prototype._updateTotalNbImagesLeftToSave = function(nbTiles) {
+    this._nbTilesLeftToSave = nbTiles;
+    return this._eventEmitter.fire('tilecachingprogressstart', {
+      nbTiles: this._nbTilesLeftToSave
+    });
+  };
+
+  ImageStore.prototype._decrementNbTilesLeftToSave = function() {
+    this._nbTilesLeftToSave--;
+    if (!this._beingCanceled) {
+      this._eventEmitter.fire('tilecachingprogress', {
+        nbTiles: this._nbTilesLeftToSave
+      });
+    }
+    this._nbImagesCurrentlyBeingRetrieved--;
+    if (this._beingCanceled && this._nbImagesCurrentlyBeingRetrieved === 0) {
+      return this._finish();
+    }
+  };
+
+  return ImageStore;
+
+})();
+
+
+},{"./IndexedDBDataStorage":6,"./WebSQLDataStorage":9,"async":1}],6:[function(require,module,exports){
+var IDBStore, IndexedDBDataStorage;
+
+IDBStore = require('idb-wrapper');
+
+module.exports = IndexedDBDataStorage = (function() {
+  function IndexedDBDataStorage(storeName, onReady, onError) {
+    this._idbStore = new IDBStore({
+      dbVersion: 1,
+      storeName: storeName,
+      keyPath: null,
+      autoIncrement: false
+    }, onReady, onError);
+  }
+
+  IndexedDBDataStorage.prototype.get = function(key, onSuccess, onError) {
+    return this._idbStore.get(key, onSuccess, onError);
+  };
+
+  IndexedDBDataStorage.prototype.clear = function(onSuccess, onError) {
+    return this._idbStore.clear(onSuccess, onError);
+  };
+
+  IndexedDBDataStorage.prototype.put = function(key, object, onSuccess, onError) {
+    return this._idbStore.put(key, object, onSuccess, onError);
+  };
+
+  IndexedDBDataStorage.prototype.getDenseBatch = function(tileImagesToQueryArray, onSuccess, onError) {
+    return this._idbStore.getBatch(tileImagesToQueryArray, onSuccess, onError, 'dense');
+  };
+
+  return IndexedDBDataStorage;
+
+})();
+
+
+},{"idb-wrapper":3}],7:[function(require,module,exports){
+var ImageRetriever, ImageStore, OfflineLayer,
+  __hasProp = {}.hasOwnProperty,
+  __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+
+ImageStore = require('./ImageStore');
+
+ImageRetriever = require('./ImageRetriever');
+
+module.exports = OfflineLayer = (function(_super) {
+  __extends(OfflineLayer, _super);
+
+  function OfflineLayer() {
+    return OfflineLayer.__super__.constructor.apply(this, arguments);
+  }
+
+  OfflineLayer.prototype.initialize = function(url, options) {
+    var dbOption, err, imageRetriever, storeName, useWebSQL;
+    L.TileLayer.prototype.initialize.call(this, url, options);
+    this._onReady = options["onReady"];
+    this._onError = options["onError"];
+    dbOption = options["dbOption"];
+    storeName = options["storeName"] || 'OfflineLeafletTileImages';
+    this._tileImagesStore = null;
+    this._minZoomLevel = 12;
+    if (options["minZoomLevel"] != null) {
+      this._minZoomLevel = parseInt(options["minZoomLevel"]);
+    }
+    if ((dbOption != null) && dbOption !== "None") {
+      try {
+        if (dbOption === "WebSQL") {
+          useWebSQL = true;
+        } else if (dbOption === "IndexedDB") {
+          useWebSQL = false;
+        } else {
+          this._onError("COULD_NOT_CREATE_DB", "Invalid dbOption parameter: " + dbOption);
+        }
+        imageRetriever = new ImageRetriever(this);
+        this._tileImagesStore = new ImageStore(this, imageRetriever);
+        return this._tileImagesStore.createDB(storeName, (function(_this) {
+          return function() {
+            return _this._onReady();
+          };
+        })(this), (function(_this) {
+          return function(error) {
+            _this._tileImagesStore = null;
+            _this._reportError("COULD_NOT_CREATE_DB", error);
+            return setTimeout(function() {
+              return _this._onReady();
+            }, 0);
+          };
+        })(this), useWebSQL);
+      } catch (_error) {
+        err = _error;
+        this._tileImagesStore = null;
+        this._reportError("COULD_NOT_CREATE_DB", err);
+        return setTimeout((function(_this) {
+          return function() {
+            return _this._onReady();
+          };
+        })(this), 0);
+      }
+    } else {
+      return setTimeout((function(_this) {
+        return function() {
+          return _this._onReady();
+        };
+      })(this), 0);
+    }
+  };
+
+  OfflineLayer.prototype._setUpTile = function(tile, key, value) {
+    tile.src = value;
+    return this.fire('tileloadstart', {
+      tile: tile,
+      url: tile.src
+    });
+  };
+
+  OfflineLayer.prototype._reportError = function(errorType, errorData) {
+    if (this._onError) {
+      return this._onError(errorType, errorData);
+    }
+  };
+
+  OfflineLayer.prototype._loadTile = function(tile, tilePoint) {
+    var key, onError, onSuccess;
+    if (!this._tileImagesStore) {
+      return L.TileLayer.prototype._loadTile.call(this, tile, tilePoint);
+    }
+    tile._layer = this;
+    tile.onerror = this._tileOnError;
+    this._adjustTilePoint(tilePoint);
+    tile.onload = this._tileOnLoad;
+    onSuccess = (function(_this) {
+      return function(dbEntry) {
+        if (dbEntry) {
+          return _this._setUpTile(tile, key, dbEntry.image);
+        } else {
+          return _this._setUpTile(tile, key, _this.getTileUrl(tilePoint));
+        }
+      };
+    })(this);
+    onError = (function(_this) {
+      return function() {
+        _this._setUpTile(tile, key, _this.getTileUrl(tilePoint));
+        return _this._reportError("DB_GET", key);
+      };
+    })(this);
+    key = this._createTileKey(tilePoint.x, tilePoint.y, tilePoint.z);
+    return this._tileImagesStore.get(key, onSuccess, onError);
+  };
+
+  OfflineLayer.prototype.useDB = function() {
+    return this._tileImagesStore !== null;
+  };
+
+  OfflineLayer.prototype.cancel = function() {
+    if (this._tileImagesStore != null) {
+      return this._tileImagesStore.cancel();
+    }
+    return false;
+  };
+
+  OfflineLayer.prototype.clearTiles = function(onSuccess, onError) {
+    if (!this.useDB()) {
+      this._reportError("NO_DB", "No DB available");
+      onError("No DB available");
+      return;
+    }
+    if (this.isBusy()) {
+      this._reportError("SYSTEM_BUSY", "System is busy.");
+      onError("System is busy.");
+      return;
+    }
+    return this._tileImagesStore.clear(onSuccess, (function(_this) {
+      return function(error) {
+        _this._reportError("COULD_NOT_CLEAR_DB", error);
+        return onError(error);
+      };
+    })(this));
+  };
+
+  OfflineLayer.prototype.calculateNbTiles = function(zoomLevelLimit) {
+    var count, key, tileImagesToQuery;
+    if (this._map.getZoom() < this._minZoomLevel) {
+      this._reportError("ZOOM_LEVEL_TOO_LOW");
+      return -1;
+    }
+    count = 0;
+    tileImagesToQuery = this._getTileImages(zoomLevelLimit);
+    for (key in tileImagesToQuery) {
+      count++;
+    }
+    return count;
+  };
+
+  OfflineLayer.prototype.isBusy = function() {
+    if (this._tileImagesStore != null) {
+      return this._tileImagesStore.isBusy();
+    }
+    return false;
+  };
+
+  OfflineLayer.prototype._getTileImages = function(zoomLevelLimit) {
+    var arrayLength, bounds, i, j, map, maxX, maxY, minX, minY, point, roundedTileBounds, startingZoom, tileBounds, tileImagesToQuery, tileSize, tilesInScreen, x, y, _i, _j, _k, _ref, _ref1, _ref2, _ref3;
+    zoomLevelLimit = zoomLevelLimit || this._map.getMaxZoom();
+    tileImagesToQuery = {};
+    map = this._map;
+    startingZoom = map.getZoom();
+    bounds = map.getPixelBounds();
+    tileSize = this._getTileSize();
+    roundedTileBounds = L.bounds(bounds.min.divideBy(tileSize)._floor(), bounds.max.divideBy(tileSize)._floor());
+    tilesInScreen = [];
+    for (j = _i = _ref = roundedTileBounds.min.y, _ref1 = roundedTileBounds.max.y; _ref <= _ref1 ? _i <= _ref1 : _i >= _ref1; j = _ref <= _ref1 ? ++_i : --_i) {
+      for (i = _j = _ref2 = roundedTileBounds.min.x, _ref3 = roundedTileBounds.max.x; _ref2 <= _ref3 ? _j <= _ref3 : _j >= _ref3; i = _ref2 <= _ref3 ? ++_j : --_j) {
+        tilesInScreen.push(new L.Point(i, j));
+      }
+    }
+    tileBounds = L.bounds(bounds.min.divideBy(tileSize), bounds.max.divideBy(tileSize));
+    minY = tileBounds.min.y;
+    maxY = tileBounds.max.y;
+    minX = tileBounds.min.x;
+    maxX = tileBounds.max.x;
+    arrayLength = tilesInScreen.length;
+    for (i = _k = 0; 0 <= arrayLength ? _k < arrayLength : _k > arrayLength; i = 0 <= arrayLength ? ++_k : --_k) {
+      point = tilesInScreen[i];
+      x = point.x;
+      y = point.y;
+      this._getZoomedInTiles(x, y, startingZoom, zoomLevelLimit, tileImagesToQuery, minY, maxY, minX, maxX);
+      this._getZoomedOutTiles(x, y, startingZoom, 0, tileImagesToQuery, minY, maxY, minX, maxX);
+    }
+    return tileImagesToQuery;
+  };
+
+  OfflineLayer.prototype.saveTiles = function(zoomLevelLimit, onStarted, onSuccess, onError) {
+    var tileImagesToQuery;
+    if (!this._tileImagesStore) {
+      this._reportError("NO_DB", "No DB available");
+      onError("No DB available");
+      return;
+    }
+    if (this.isBusy()) {
+      this._reportError("SYSTEM_BUSY", "system is busy.");
+      onError("system is busy.");
+      return;
+    }
+    if (this._map.getZoom() < this._minZoomLevel) {
+      this._reportError("ZOOM_LEVEL_TOO_LOW");
+      onError("ZOOM_LEVEL_TOO_LOW");
+      return;
+    }
+    tileImagesToQuery = this._getTileImages(zoomLevelLimit);
+    return this._tileImagesStore.saveImages(tileImagesToQuery, onStarted, onSuccess, (function(_this) {
+      return function(error) {
+        _this._reportError("SAVING_TILES", error);
+        return onError(error);
+      };
+    })(this));
+  };
+
+  OfflineLayer.prototype._getZoomedInTiles = function(x, y, currentZ, maxZ, tileImagesToQuery, minY, maxY, minX, maxX) {
+    this._getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, true);
+    if (currentZ < maxZ) {
+      minY *= 2;
+      maxY *= 2;
+      minX *= 2;
+      maxX *= 2;
+      this._getZoomedInTiles(x * 2, y * 2, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
+      this._getZoomedInTiles(x * 2 + 1, y * 2, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
+      this._getZoomedInTiles(x * 2, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
+      return this._getZoomedInTiles(x * 2 + 1, y * 2 + 1, currentZ + 1, maxZ, tileImagesToQuery, minY, maxY, minX, maxX);
+    }
+  };
+
+  OfflineLayer.prototype._getZoomedOutTiles = function(x, y, currentZ, finalZ, tileImagesToQuery, minY, maxY, minX, maxX) {
+    this._getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, false);
+    if (currentZ > finalZ) {
+      minY /= 2;
+      maxY /= 2;
+      minX /= 2;
+      maxX /= 2;
+      return this._getZoomedOutTiles(Math.floor(x / 2), Math.floor(y / 2), currentZ - 1, finalZ, tileImagesToQuery, minY, maxY, minX, maxX);
+    }
+  };
+
+  OfflineLayer.prototype._getTileImage = function(x, y, z, tileImagesToQuery, minY, maxY, minX, maxX) {
+    var key;
+    if (x < Math.floor(minX) || x > Math.floor(maxX) || y < Math.floor(minY) || y > Math.floor(maxY)) {
+      return;
+    }
+    key = this._createTileKey(x, y, z);
+    if (!tileImagesToQuery[key]) {
+      return tileImagesToQuery[key] = {
+        key: key,
+        x: x,
+        y: y,
+        z: z
+      };
+    }
+  };
+
+  OfflineLayer.prototype._createNormalizedTilePoint = function(x, y, z) {
+    var nbTilesAtZoomLevel;
+    nbTilesAtZoomLevel = Math.pow(2, z);
+    while (x > nbTilesAtZoomLevel) {
+      x -= nbTilesAtZoomLevel;
+    }
+    while (x < 0) {
+      x += nbTilesAtZoomLevel;
+    }
+    while (y > nbTilesAtZoomLevel) {
+      y -= nbTilesAtZoomLevel;
+    }
+    while (y < 0) {
+      y += nbTilesAtZoomLevel;
+    }
+    return {
+      x: x,
+      y: y,
+      z: z
+    };
+  };
+
+  OfflineLayer.prototype._createURL = function(x, y, z) {
+    var tilePoint;
+    tilePoint = this._createNormalizedTilePoint(x, y, z);
+    return this.getTileUrl(tilePoint);
+  };
+
+  OfflineLayer.prototype._createTileKey = function(x, y, z) {
+    var tilePoint;
+    tilePoint = this._createNormalizedTilePoint(x, y, z);
+    return tilePoint.x + ", " + tilePoint.y + ", " + tilePoint.z;
+  };
+
+  return OfflineLayer;
+
+})(L.TileLayer);
+
+
+},{"./ImageRetriever":4,"./ImageStore":5}],8:[function(require,module,exports){
+var OfflineProgressControl,
+  __hasProp = {}.hasOwnProperty,
+  __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+
+module.exports = OfflineProgressControl = (function(_super) {
+  __extends(OfflineProgressControl, _super);
+
+  function OfflineProgressControl() {
+    return OfflineProgressControl.__super__.constructor.apply(this, arguments);
+  }
+
+  OfflineProgressControl.prototype.onAdd = function(map) {
+    var controls;
+    controls = L.DomUtil.create('div', 'offlinemap-controls', this._container);
+    controls.setAttribute('id', 'offlinemap-controls');
+    this._counter = L.DomUtil.create('div', 'offlinemap-controls-counter', controls);
+    this._counter.setAttribute('id', 'offlinemap-controls-counter');
+    this._counter.innerHTML = "Ready";
+    this._cancelButton = L.DomUtil.create('input', 'offlinemap-controls-cancel-button', controls);
+    this._cancelButton.setAttribute('type', "button");
+    this._cancelButton.setAttribute('id', "cancelBtn");
+    this._cancelButton.setAttribute('value', "Cancel");
+    this._cancelButton.setAttribute('disabled', true);
+    L.DomEvent.addListener(this._cancelButton, 'click', this.onCancelClick, this);
+    L.DomEvent.disableClickPropagation(this._cancelButton);
+    return controls;
+  };
+
+  OfflineProgressControl.prototype.onProgressStart = function() {
+    this._evaluating = true;
+    this._counter.innerHTML = "...";
+    return this._cancelButton.removeAttribute('disabled');
+  };
+
+  OfflineProgressControl.prototype.onProgressDone = function() {
+    this._counter.innerHTML = "Ready";
+    return this._cancelButton.removeAttribute('disabled');
+  };
+
+  OfflineProgressControl.prototype.updateTotalNbTilesLeftToSave = function(event) {
+    this._evaluating = false;
+    this._nbTilesToSave = event.nbTiles;
+    return this.updateNbTilesLeftToSave(event);
+  };
+
+  OfflineProgressControl.prototype.updateNbTilesLeftToSave = function(event) {
+    if (!this._evaluating) {
+      if (this._nbTilesToSave === 0) {
+        return this._counter.innerHTML = "100%";
+      } else {
+        return this._counter.innerHTML = Math.floor((this._nbTilesToSave - event.nbTiles) / this._nbTilesToSave * 100) + "%";
+      }
+    }
+  };
+
+  OfflineProgressControl.prototype.onCancelClick = function() {
+    if (this._offlineLayer.cancel()) {
+      this._counter.innerHTML = "Canceling...";
+      return this._cancelButton.setAttribute('disabled', true);
+    }
+  };
+
+  OfflineProgressControl.prototype.setOfflineLayer = function(offlineLayer) {
+    this._offlineLayer = offlineLayer;
+    this._offlineLayer.on('tilecachingstart', this.onProgressStart, this);
+    this._offlineLayer.on('tilecachingprogressstart', this.updateTotalNbTilesLeftToSave, this);
+    this._offlineLayer.on('tilecachingprogress', this.updateNbTilesLeftToSave, this);
+    return this._offlineLayer.on('tilecachingprogressdone', this.onProgressDone, this);
+  };
+
+  return OfflineProgressControl;
+
+})(L.Control);
+
+
+},{}],9:[function(require,module,exports){
+var WebSQLDataStorage;
+
+module.exports = WebSQLDataStorage = (function() {
+  function WebSQLDataStorage(storeName, onReady, onError) {
+    this._storeName = storeName;
+    this._webSQLDB = openDatabase('OfflineTileImages', '1.0', 'Store tile images for OfflineLeaftMap', 50 * 1024 * 1024);
+    this._webSQLDB.transaction((function(_this) {
+      return function(tx) {
+        return tx.executeSql("CREATE TABLE IF NOT EXISTS " + _this._storeName + " (key unique, image)");
+      };
+    })(this), onError, onReady);
+  }
+
+  WebSQLDataStorage.prototype.get = function(key, onSuccess, onError) {
+    return this._webSQLDB.transaction((function(_this) {
+      return function(tx) {
+        var onSQLSuccess;
+        onSQLSuccess = function(tx, results) {
+          var len;
+          len = results.rows.length;
+          if (len === 0) {
+            return onSuccess(void 0);
+          } else if (len === 1) {
+            return onSuccess(results.rows.item(0));
+          } else {
+            return onError('There should be no more than one entry');
+          }
+        };
+        return tx.executeSql("SELECT * FROM " + _this._storeName + " WHERE key='" + key + "'", [], onSQLSuccess, onError);
+      };
+    })(this));
+  };
+
+  WebSQLDataStorage.prototype.clear = function(onSuccess, onError) {
+    return this._webSQLDB.transaction((function(_this) {
+      return function(tx) {
+        return tx.executeSql("DELETE FROM " + _this._storeName, [], onSuccess, onError);
+      };
+    })(this));
+  };
+
+  WebSQLDataStorage.prototype.put = function(key, object, onSuccess, onError) {
+    return this._webSQLDB.transaction((function(_this) {
+      return function(tx) {
+        return tx.executeSql("INSERT OR REPLACE INTO " + _this._storeName + " VALUES (?, ?)", [key, object.image], onSuccess, onError);
+      };
+    })(this));
+  };
+
+  WebSQLDataStorage.prototype.getDenseBatch = function(tileImagesToQueryArray, onSuccess, onError) {
+    if (tileImagesToQueryArray.length === 0) {
+      onSuccess([]);
+    }
+    return this._webSQLDB.transaction((function(_this) {
+      return function(tx) {
+        var i, keys, onSQLSuccess, result, tileImagesToQueryArray2, _i, _ref;
+        result = [];
+        tileImagesToQueryArray2 = [];
+        for (i = _i = 0, _ref = tileImagesToQueryArray.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+          tileImagesToQueryArray2.push("'" + tileImagesToQueryArray[i] + "'");
+          result.push(void 0);
+        }
+        keys = tileImagesToQueryArray2.join(',');
+        onSQLSuccess = function(tx, results) {
+          var index, item, _j, _ref1;
+          for (i = _j = 0, _ref1 = results.rows.length; 0 <= _ref1 ? _j < _ref1 : _j > _ref1; i = 0 <= _ref1 ? ++_j : --_j) {
+            item = results.rows.item(i);
+            index = tileImagesToQueryArray.indexOf(item.key);
+            if (index >= 0) {
+              result[index] = item;
+            }
+          }
+          return onSuccess(result);
+        };
+        return tx.executeSql("SELECT * FROM " + _this._storeName + " WHERE key IN (" + keys + ")", [], onSQLSuccess, onError);
+      };
+    })(this));
+  };
+
+  return WebSQLDataStorage;
+
+})();
+
+
+},{}],10:[function(require,module,exports){
+window.OfflineLayer = require('./OfflineLayer');
+
+window.OfflineProgressControl = require('./OfflineProgressControl');
+
+
+},{"./OfflineLayer":7,"./OfflineProgressControl":8}]},{},[10])
