@@ -20,7 +20,7 @@ gulp.task 'prepareTests', ['build'], () ->
     .pipe(gulp.dest('./test'))
   return stream
 
-gulp.task 'browserify', () ->
+gulp.task 'demo', () ->
   bundler = browserify("./demo.coffee",
     extensions: [".coffee"]
     basedir: "./src/")
@@ -40,5 +40,5 @@ gulp.task 'standalone', () ->
     .pipe(uglify())
     .pipe(gulp.dest('./dist/'))
 
-gulp.task 'build', ['coffee', 'browserify']
+gulp.task 'build', ['coffee', 'demo', 'standalone']
 gulp.task 'default', ['build']
