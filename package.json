@@ -12,7 +12,7 @@
       "coffeeify"
     ]
   },
-  "repository": "...",
+  "repository": "https://github.com/mWater/offline-leaflet-map",
   "author": "Mathieu Briau",
   "license": "GPLv3",
   "devDependencies": {
