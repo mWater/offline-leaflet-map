@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style>
+        #map { height: 720px; }
+        #offlinemap-controls {background-color:#b0c4de; }
+        #offlinemap-controls-counter {margin-left:auto; margin-right:auto; width:70%;}
+    </style>
+
+    <link rel="stylesheet" href="./leaflet.css" />
+    <script type="text/javascript" src="./leaflet.js"></script>
+
+</head>
+<body>
+
+    <div>
+      <button onclick='loadRegions();'>Load Regions</button>
+
+      <button onclick='clearTiles();'>Clear Tiles</button>
+
+      <button onclick='showMap();'>Show Map</button>
+      <span id="position"></span>      
+    </div>
+
+    <div id='log'></div>
+    <div id="faux-map"></div>
+    <div id="map"></div>
+    
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script type="text/javascript" src="./offlinemap.js"></script>
+    <script>
+      $( document ).ready(function() {
+        window.map = null;
+        window.offlineLayer;
+        var mapquestUrl = 'http://{s}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.png'
+        var subDomains = ['otile1','otile2','otile3','otile4']
+        var mapquestAttrib = 'Data, imagery and map information provided by <a href="http://open.mapquest.co.uk" target="_blank">MapQuest</a>, <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a> and contributors.'
+
+        
+
+        loadRegions = function(){
+            // Create the map
+            $("#log").text('Loading Regions...')
+            var regions = [
+                {
+                    name: "Region 1",
+                    nLat: 44.0,
+                    sLat: 41.5,
+                    wLng: -124.4,
+                    eLng: -124.1
+                },
+                // {
+                //     name: "Region 2",
+                //     nLat: 41.5,
+                //     sLat: 39.0,
+                //     wLng: -124.6,
+                //     eLng: -124.3
+                // },
+                // {
+                //     name: "Region 3",
+                //     nLat: 39.0,
+                //     sLat: 37.0,
+                //     wLng: -124.4,
+                //     eLng: -124.1
+                // }
+            ];
+            if (!map) map = L.map('map').setView([-2.9, -79], 13);
+            
+            var options = { 
+                map: map,
+                maxZoom: 12, 
+                attribution: mapquestAttrib, 
+                subdomains: subDomains,
+                dbOnly: true, 
+                onReady: onReady, 
+                onError: onError, 
+                storeName:"myStoreName", 
+                dbOption:"WebSQL"
+            }
+            offlineLayer = new OfflineLayer( mapquestUrl, options)
+
+            nbTiles = offlineLayer.calculateNbTiles(options.maxZoom, regions);
+            if (nbTiles < 10000) {
+            console.log("Will be saving: " + nbTiles + " tiles")
+            
+
+
+            offlineLayer.saveRegions(regions, options.maxZoom, 
+              function(){
+                console.log('[saveRegions] onStarted');
+
+              },
+              function(){
+                console.log('[saveRegions] onSuccess');
+                $("#log").text('Done Loading Regions')
+              },
+              function(error){
+                console.log('onError');
+                console.log(error);
+              })
+
+            } else {
+            alert("You are trying to save " + nbTiles + " tiles. There is currently a limit of 10,000 tiles.");
+            }
+            
+            
+
+        } // End load regions
+
+        onReady = function(){
+            /* 
+            This is fired when the offlineLayer has cached all of it's tiles.
+            */
+            
+            console.log("[offlineLayer onReady()] The OfflineLayer is ready to be used");
+            
+            //offlineLayer.addTo(map);
+            // cacheBtn = new CacheBtnControl();
+            // map.addControl(cacheBtn);
+            // progressControls = new OfflineProgressControl();
+            // progressControls.setOfflineLayer(offlineLayer);
+            // map.addControl(progressControls);
+        }
+            
+
+        onError = function(errorType, errorData1, errorData2){
+            /*
+                Fires when offlineLayer errors out during tile caching.
+            */
+            console.log("[offlineLayer onError()] ");
+            console.log(errorType)
+            console.log(errorData1)
+            console.log(errorData2)
+        }
+
+        clearTiles = function(){
+            $("#log").text('clearing tiles...');
+            offlineLayer.clearTiles(
+                function(){
+                    console.log('[clearTiles] success')
+                    $("#log").text('done clearing tiles');
+                },function(error) {
+                    console.log('[clearTiles] fail')
+
+                }
+            );
+        };
+
+        showMap = function(){
+            offlineLayer.addTo(map);
+
+            map.addEventListener('mousemove', function(event){
+                $("#position").text(event.latlng.toString());
+            })
+            // var map = L.map('map').setView([40.0, -124], 10);
+            
+
+            // onReady = function(){
+            //     console.log("[showMap offlineLayer onReady()] ");
+            // }
+
+            // onError = function(errorType, errorData1, errorData2){
+            //     /*
+            //         Fires when offlineLayer errors out during tile caching.
+            //     */
+            //     console.log("[showMap offlineLayer onError()] ");
+            //     console.log(errorType)
+            //     console.log(errorData1)
+            //     console.log(errorData2)
+            // }
+
+            // var options = { 
+            //     map: map,
+            //     maxZoom: 13, 
+            //     attribution: mapquestAttrib, 
+            //     subdomains: subDomains,
+            //     dbOnly: true, 
+            //     onReady: onReady, 
+            //     onError: onError, 
+            //     storeName:"myStoreName", 
+            //     dbOption:"WebSQL"
+            // }
+            // //newLayer = new OfflineLayer( mapquestUrl, options)
+            // offlineLayer.addTo(map);
+            
+        }
+                 
+        
+      });
+    </script>
+</body>
+</html>

@@ -77,3 +77,10 @@ This could happen if these functions are called before the onReady callback or i
 ##Example
 
 Look at **src/demo.coffee** for a complete example of how to use OfflineLayer and a basic progression control example.
+
+
+To run the examples 
+
+```
+npm install
+```

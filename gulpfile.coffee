@@ -1,4 +1,4 @@
-gulp = require 'gulp'
+gulp = require ('gulp')
 coffee = require('gulp-coffee')
 gutil = require('gulp-util')
 uglify = require('gulp-uglify')
@@ -28,6 +28,7 @@ gulp.task 'demo', () ->
     .pipe(streamConvert('bundle.js'))
     .pipe(gulp.dest("./demo/"))
 
+
 gulp.task 'standalone', () ->
   bundler = browserify("./standalone.coffee",
     extensions: [".coffee"]
@@ -35,6 +36,7 @@ gulp.task 'standalone', () ->
   bundler.bundle()
     .pipe(streamConvert('offlinemap.js'))
     .pipe(gulp.dest("./dist/"))
+    .pipe(gulp.dest("./demo/"))
     .pipe(buffer())
     .pipe(rename("offlinemap.min.js"))
     .pipe(uglify())
