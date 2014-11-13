@@ -35,36 +35,50 @@
         var subDomains = ['otile1','otile2','otile3','otile4']
         var mapquestAttrib = 'Data, imagery and map information provided by <a href="http://open.mapquest.co.uk" target="_blank">MapQuest</a>, <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a> and contributors.'
 
-        
 
-        loadRegions = function(){
-            // Create the map
-            $("#log").text('Loading Regions...')
-            var regions = [
+        var regions = [
                 {
-                    name: "Region 1",
-                    nLat: 44.0,
-                    sLat: 41.5,
-                    wLng: -124.4,
-                    eLng: -124.1
+                    name: "Region 1 - Coos Bay to OR/CA Border",
+                    nLat: 43.5,
+                    sLat: 42.0,
+                    wLng: -124.7,
+                    eLng: -124.2
                 },
-                // {
-                //     name: "Region 2",
-                //     nLat: 41.5,
-                //     sLat: 39.0,
-                //     wLng: -124.6,
-                //     eLng: -124.3
-                // },
-                // {
-                //     name: "Region 3",
-                //     nLat: 39.0,
-                //     sLat: 37.0,
-                //     wLng: -124.4,
-                //     eLng: -124.1
-                // }
+                {
+                    name: "Region 2 - OR/CA Border to Shelter Cove",
+                    nLat: 42.0,
+                    sLat: 40.0,
+                    wLng: -124.5,
+                    eLng: -123.8
+                },
+                {
+                    name: "Region 3 - Shelter Cove to ???",
+                    nLat: 40.0,
+                    sLat: 32.0,
+                    wLng: -124.0,
+                    eLng: -123.5
+                }
             ];
+
+         onReady = function(){
+            /* 
+            This is fired when the offlineLayer has cached all of it's tiles.
+            */
+            console.log("[offlineLayer onReady()] The OfflineLayer is ready to be used");
+        }
+
+        onError = function(errorType, errorData1, errorData2){
+            /*
+                Fires when offlineLayer errors out during tile caching.
+            */
+            console.log("[offlineLayer onError()] ");
+            console.log(errorType)
+            console.log(errorData1)
+            console.log(errorData2)
+        }
+
+        init = function(){
             if (!map) map = L.map('map').setView([-2.9, -79], 13);
-            
             var options = { 
                 map: map,
                 maxZoom: 12, 
@@ -76,15 +90,21 @@
                 storeName:"myStoreName", 
                 dbOption:"WebSQL"
             }
-            offlineLayer = new OfflineLayer( mapquestUrl, options)
+            offlineLayer = new OfflineLayer( mapquestUrl, options);
+        }
+        init();
 
-            nbTiles = offlineLayer.calculateNbTiles(options.maxZoom, regions);
+        loadRegions = function(){
+            // Create the map
+            $("#log").text('Loading Regions...')
+
+            nbTiles = offlineLayer.calculateNbTiles(offlineLayer.options.maxZoom, regions);
             if (nbTiles < 10000) {
             console.log("Will be saving: " + nbTiles + " tiles")
             
 
 
-            offlineLayer.saveRegions(regions, options.maxZoom, 
+            offlineLayer.saveRegions(regions, offlineLayer.options.maxZoom, 
               function(){
                 console.log('[saveRegions] onStarted');
 
@@ -106,31 +126,7 @@
 
         } // End load regions
 
-        onReady = function(){
-            /* 
-            This is fired when the offlineLayer has cached all of it's tiles.
-            */
-            
-            console.log("[offlineLayer onReady()] The OfflineLayer is ready to be used");
-            
-            //offlineLayer.addTo(map);
-            // cacheBtn = new CacheBtnControl();
-            // map.addControl(cacheBtn);
-            // progressControls = new OfflineProgressControl();
-            // progressControls.setOfflineLayer(offlineLayer);
-            // map.addControl(progressControls);
-        }
-            
 
-        onError = function(errorType, errorData1, errorData2){
-            /*
-                Fires when offlineLayer errors out during tile caching.
-            */
-            console.log("[offlineLayer onError()] ");
-            console.log(errorType)
-            console.log(errorData1)
-            console.log(errorData2)
-        }
 
         clearTiles = function(){
             $("#log").text('clearing tiles...');
@@ -151,6 +147,7 @@
             map.addEventListener('mousemove', function(event){
                 $("#position").text(event.latlng.toString());
             })
+            map.setView([40.0, -124], 10);
             // var map = L.map('map').setView([40.0, -124], 10);
             
 
