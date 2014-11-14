@@ -79,7 +79,7 @@ module.exports = class OfflineLayer extends L.TileLayer
 
   # look at the code from L.TileLayer for more details
   _loadTile: (tile, tilePoint) ->
-    if not @_dbOnly == true
+      if not @_dbOnly == true
       @_dbOnly = false;
     if not @_tileImagesStore
       return L.TileLayer.prototype._loadTile.call(this, tile, tilePoint)
@@ -233,7 +233,9 @@ module.exports = class OfflineLayer extends L.TileLayer
     )
 
 
-# Returns tiles that are gotten from the defined regions.
+ 
+  _getTilesByRegion: (zoomLevelLimit, regions) ->
+    # Returns tiles that are gotten from the defined regions.
     # Regions are boxes defined by lat and lng.
     # Params:
     #   - zoomLevelLimit: [Integer] the maximum zoom level to use in caching images.
@@ -245,8 +247,7 @@ module.exports = class OfflineLayer extends L.TileLayer
     #       wLng:,
     #       eLng:
     #      }
-    # } 
-  _getTilesByRegion: (zoomLevelLimit, regions) ->
+    # }
     console.log('[_getTilesByRegion()]');
     zoomLevelLimit = zoomLevelLimit || @_map.getMaxZoom()
     startingZoom = 12

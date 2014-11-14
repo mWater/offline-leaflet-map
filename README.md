@@ -25,6 +25,8 @@ It is initialized the same way, using url and options but it has extra options:
                 The idea is to make it possible to zoom in but also to locate your saved data from a lower zoom level
                 when working offline. **zoomLevelLimit** will limit the zoom depth.
 
+* **saveRegions(regions, zoomLevel, onStarted, onSuccess, onError):**
+save all tiles with the regions defined on the `regions` parameter.  `regions` is an Array objects. Each object defines a lat/lon box. This will cahce al tiles in this region with the same behavior as saveTiles. See the [regions-demo.html  example](#regions-demo)
 * **calculateNbTiles(zoomLevelLimit):** An important function that will tell you how many tiles would be saved by a call to saveTiles.
                     Make sure to call this function and limit any call to saveTiles() if you want to avoid saving
                     millions of tiles. **zoomLevelLimit** will limit the zoom depth.
@@ -62,10 +64,14 @@ This could happen if these functions are called before the onReady callback or i
 
 
 **saveTiles() errors:**
+
 * **"SYSTEM\_BUSY":** System is busy.
+
 * **"SAVING\_TILES":** An error occurred when calling saveTiles.
+
 * **"DB\_GET":** An error occurred when calling get on ImageStore. errorData is the DB key of the tile.
 * **"GET\_STATUS\_ERROR":** The XMLHttpRequest Get status is not equal to 200. errorData contains the error from XMLHttpRequest and the URL of the image.
+
 * **"NETWORK\_ERROR":** The XMLHttpRequest used to get an image threw an error. errorData contains the error from XMLHttpRequest and the URL of the image.
 
 **clearTiles() errors:**
@@ -74,13 +80,57 @@ This could happen if these functions are called before the onReady callback or i
 
 
 
-##Example
-
-Look at **src/demo.coffee** for a complete example of how to use OfflineLayer and a basic progression control example.
-
-
-To run the examples 
+##Examples
+To build the examples
 
 ```
 npm install
+gulp
 ```
+
+To run an example start a webserver in the `/demo`
+
+```
+cd demo
+cd http-server
+```
+
+The navigate to `localhost:8081/` or `localhost:8081/regions-demo.html` for the regions example.
+
+### Example 1. Caching tiles in the current viewport
+Look at **src/demo.coffee** for a complete example of how to use OfflineLayer and a basic progression control example.
+
+### Example 2. Caching tiles from pre-defined regions
+The example is defined in `demo/regions-demo.html`. It loads tiles from from a list of regions defined in a regions array. These tiles are then available any time you want to create a map. This is useful for loading tiles into an app for a specific geographic area
+
+Here is an example of a regions array:
+```
+# This regions caches a strip of coastline on the US West Coast.
+regions = [
+                {
+                    name: "Region 1",
+                    nLat: 43.5,
+                    sLat: 42.0,
+                    wLng: -124.7,
+                    eLng: -124.2
+                },
+                {
+                    name: "Region 2",
+                    nLat: 42.0,
+                    sLat: 40.0,
+                    wLng: -124.5,
+                    eLng: -123.8
+                },
+                {
+                    name: "Region 3",
+                    nLat: 40.0,
+                    sLat: 32.0,
+                    wLng: -124.0,
+                    eLng: -123.5
+                }
+            ];
+
+```
+
+
+----

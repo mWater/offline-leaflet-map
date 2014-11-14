@@ -17,12 +17,12 @@
 
       <button onclick='clearTiles();'>Clear Tiles</button>
 
-      <button onclick='showMap();'>Show Map</button>
+      <button onclick='showNewMap();'>Show Map</button>
       <span id="position"></span>      
     </div>
 
     <div id='log'></div>
-    <div id="faux-map"></div>
+    <div id="new-map" width='400' height='400'></div>
     <div id="map"></div>
     
     <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
@@ -31,6 +31,10 @@
       $( document ).ready(function() {
         window.map = null;
         window.offlineLayer;
+        window.noaaLayer;
+        
+        var noaaUrl = 'http://tile.stamen.com/watercolor/{z}/{x}/{y}.jpg'
+
         var mapquestUrl = 'http://{s}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.png'
         var subDomains = ['otile1','otile2','otile3','otile4']
         var mapquestAttrib = 'Data, imagery and map information provided by <a href="http://open.mapquest.co.uk" target="_blank">MapQuest</a>, <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a> and contributors.'
@@ -52,7 +56,7 @@
                     eLng: -123.8
                 },
                 {
-                    name: "Region 3 - Shelter Cove to ???",
+                    name: "Region 3 - Shelter Cove to Point Arena",
                     nLat: 40.0,
                     sLat: 32.0,
                     wLng: -124.0,
@@ -60,7 +64,7 @@
                 }
             ];
 
-         onReady = function(){
+        onReady = function(){
             /* 
             This is fired when the offlineLayer has cached all of it's tiles.
             */
@@ -87,10 +91,24 @@
                 dbOnly: true, 
                 onReady: onReady, 
                 onError: onError, 
-                storeName:"myStoreName", 
-                dbOption:"WebSQL"
+                storeName:"OSMTiles", 
+                dbOption:"IndexedDB"
             }
             offlineLayer = new OfflineLayer( mapquestUrl, options);
+
+            var options = { 
+                map: map,
+                maxZoom: 12, 
+                attribution: mapquestAttrib, 
+                //subdomains: subDomains,
+                dbOnly: true, 
+                onReady: onReady, 
+                onError: onError, 
+                storeName:"NOAATiles", 
+                dbOption:"IndexedDB"
+            }
+            noaaLayer = new OfflineLayer( noaaUrl, options);
+
         }
         init();
 
@@ -100,34 +118,42 @@
 
             nbTiles = offlineLayer.calculateNbTiles(offlineLayer.options.maxZoom, regions);
             if (nbTiles < 10000) {
-            console.log("Will be saving: " + nbTiles + " tiles")
-            
+                console.log("Will be saving: " + nbTiles + " tiles")
 
+                offlineLayer.saveRegions(regions, offlineLayer.options.maxZoom, 
+                  function(){
+                    console.log('[saveRegions] onStarted');
 
-            offlineLayer.saveRegions(regions, offlineLayer.options.maxZoom, 
-              function(){
-                console.log('[saveRegions] onStarted');
+                  },
+                  function(){
+                    console.log('[saveRegions] onSuccess');
+                    $("#log").text('Done Loading OSM Regions')
+                  },
+                  function(error){
+                    console.log('onError');
+                    console.log(error);
+                  })
 
-              },
-              function(){
-                console.log('[saveRegions] onSuccess');
-                $("#log").text('Done Loading Regions')
-              },
-              function(error){
-                console.log('onError');
-                console.log(error);
-              })
+                noaaLayer.saveRegions(regions, noaaLayer.options.maxZoom, 
+                  function(){
+                    console.log('[saveRegions] onStarted');
+
+                  },
+                  function(){
+                    console.log('[saveRegions] onSuccess');
+                    $("#log").text('Done Loading NOAA Regions')
+                  },
+                  function(error){
+                    console.log('onError');
+                    console.log(error);
+                  })
 
             } else {
-            alert("You are trying to save " + nbTiles + " tiles. There is currently a limit of 10,000 tiles.");
+                alert("You are trying to save " + nbTiles + " tiles. There is currently a limit of 10,000 tiles.");
             }
-            
-            
 
         } // End load regions
-
-
-
+        
         clearTiles = function(){
             $("#log").text('clearing tiles...');
             offlineLayer.clearTiles(
@@ -139,48 +165,86 @@
 
                 }
             );
+
+            noaaLayer.clearTiles(
+                function(){
+                    console.log('[clearTiles] success')
+                    $("#log").text('done clearing tiles');
+                },function(error) {
+                    console.log('[clearTiles] fail')
+
+                }
+            );
+
         };
 
-        showMap = function(){
-            offlineLayer.addTo(map);
+        
+        showNewMap = function(){
+            $("#map").hide();
+            if (!newMap) {
+                var newMap = L.map('new-map', {
+                    center: [40.0, -124],
+                    zoom: 10,
+                    //layers: [offlineLayer, noaaLayer]
+                })
+            
+            }
 
-            map.addEventListener('mousemove', function(event){
+            onReady = function(){
+                console.log("[newMap offlineLayer onReady()] ");
+            }
+
+            onError = function(errorType, errorData1, errorData2){
+                /*
+                    Fires when offlineLayer errors out during tile caching.
+                */
+                console.log("[newMap offlineLayer onError()] ");
+                console.log(errorType)
+                console.log(errorData1)
+                console.log(errorData2)
+            }
+
+            var options = { 
+                map: newMap,
+                maxZoom: 13, 
+                attribution: mapquestAttrib, 
+                subdomains: subDomains,
+                dbOnly: true, 
+                onReady: onReady, 
+                onError: onError, 
+                storeName:"OSMTiles", 
+                dbOption:"WebSQL"
+            }
+            
+            newLayer = new OfflineLayer( mapquestUrl, options)
+            newLayer.addTo(newMap);
+            
+            var options = { 
+                map: newMap,
+                maxZoom: 12, 
+                attribution: mapquestAttrib, 
+                //subdomains: subDomains,
+                dbOnly: true, 
+                onReady: onReady, 
+                onError: onError, 
+                storeName:"NOAATiles", 
+                dbOption:"IndexedDB"
+            }
+            noaaLayer = new OfflineLayer( noaaUrl, options);
+            noaaLayer.addTo(newMap);
+            
+            var baseMaps = {
+                "OSM": offlineLayer,
+                "NOAA": noaaLayer,
+            };
+            L.control.layers(baseMaps).addTo(newMap);
+            newMap.addEventListener('mousemove', function(event){
                 $("#position").text(event.latlng.toString());
             })
-            map.setView([40.0, -124], 10);
-            // var map = L.map('map').setView([40.0, -124], 10);
             
+        }    
 
-            // onReady = function(){
-            //     console.log("[showMap offlineLayer onReady()] ");
-            // }
 
-            // onError = function(errorType, errorData1, errorData2){
-            //     /*
-            //         Fires when offlineLayer errors out during tile caching.
-            //     */
-            //     console.log("[showMap offlineLayer onError()] ");
-            //     console.log(errorType)
-            //     console.log(errorData1)
-            //     console.log(errorData2)
-            // }
-
-            // var options = { 
-            //     map: map,
-            //     maxZoom: 13, 
-            //     attribution: mapquestAttrib, 
-            //     subdomains: subDomains,
-            //     dbOnly: true, 
-            //     onReady: onReady, 
-            //     onError: onError, 
-            //     storeName:"myStoreName", 
-            //     dbOption:"WebSQL"
-            // }
-            // //newLayer = new OfflineLayer( mapquestUrl, options)
-            // offlineLayer.addTo(map);
-            
-        }
-                 
         
       });
     </script>
