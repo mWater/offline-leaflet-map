@@ -80,6 +80,7 @@ module.exports = class ImageStore
 
     @_getImagesNotInDB(tileImagesToQuery,
       (tileInfoOfImagesNotInDB) =>
+        
         if not @_beingCanceled and tileInfoOfImagesNotInDB? and tileInfoOfImagesNotInDB.length > 0
           MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8
           @_myQueue = async.queue((data, callback) =>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style>
+        #map { height: 720px; }
+        #offlinemap-controls {background-color:#b0c4de; }
+        #offlinemap-controls-counter {margin-left:auto; margin-right:auto; width:70%;}
+    </style>
+
+    <link rel="stylesheet" href="./leaflet.css" />
+    <script type="text/javascript" src="./leaflet.js"></script>
+
+</head>
+<body>
+
+    <div>
+      <button onclick='loadRegions();'>Load Regions</button>
+
+      <button onclick='clearTiles();'>Clear Tiles</button>
+
+      <button onclick='showNewMap();'>Show Map</button>
+      <span id="position"></span>      
+    </div>
+
+    <div id='log'></div>
+    <div id="new-map" width='400' height='400'></div>
+    <div id="map"></div>
+    
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script type="text/javascript" src="./offlinemap.js"></script>
+    <script>
+      $( document ).ready(function() {
+        window.map = null;
+        window.offlineLayer;
+        window.noaaLayer;
+        
+        var noaaUrl = 'http://tile.stamen.com/watercolor/{z}/{x}/{y}.jpg'
+
+        var mapquestUrl = 'http://{s}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.png'
+        var subDomains = ['otile1','otile2','otile3','otile4']
+        var mapquestAttrib = 'Data, imagery and map information provided by <a href="http://open.mapquest.co.uk" target="_blank">MapQuest</a>, <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a> and contributors.'
+
+
+        var regions = [
+                {
+                    name: "Region 1 - Coos Bay to OR/CA Border",
+                    nLat: 43.5,
+                    sLat: 42.0,
+                    wLng: -124.7,
+                    eLng: -124.2
+                },
+                {
+                    name: "Region 2 - OR/CA Border to Shelter Cove",
+                    nLat: 42.0,
+                    sLat: 40.0,
+                    wLng: -124.5,
+                    eLng: -123.8
+                },
+                {
+                    name: "Region 3 - Shelter Cove to Point Arena",
+                    nLat: 40.0,
+                    sLat: 32.0,
+                    wLng: -124.0,
+                    eLng: -123.5
+                }
+            ];
+
+        onReady = function(){
+            /* 
+            This is fired when the offlineLayer has cached all of it's tiles.
+            */
+            console.log("[offlineLayer onReady()] The OfflineLayer is ready to be used");
+        }
+
+        onError = function(errorType, errorData1, errorData2){
+            /*
+                Fires when offlineLayer errors out during tile caching.
+            */
+            console.log("[offlineLayer onError()] ");
+            console.log(errorType)
+            console.log(errorData1)
+            console.log(errorData2)
+        }
+
+        init = function(){
+            if (!map) map = L.map('map').setView([-2.9, -79], 13);
+            var options = { 
+                map: map,
+                maxZoom: 12, 
+                attribution: mapquestAttrib, 
+                subdomains: subDomains,
+                dbOnly: true, 
+                onReady: onReady, 
+                onError: onError, 
+                storeName:"OSMTiles", 
+                dbOption:"IndexedDB"
+            }
+            offlineLayer = new OfflineLayer( mapquestUrl, options);
+
+            var options = { 
+                map: map,
+                maxZoom: 12, 
+                attribution: mapquestAttrib, 
+                //subdomains: subDomains,
+                dbOnly: true, 
+                onReady: onReady, 
+                onError: onError, 
+                storeName:"NOAATiles", 
+                dbOption:"IndexedDB"
+            }
+            noaaLayer = new OfflineLayer( noaaUrl, options);
+
+        }
+        init();
+
+        loadRegions = function(){
+            // Create the map
+            $("#log").text('Loading Regions...')
+
+            nbTiles = offlineLayer.calculateNbTiles(offlineLayer.options.maxZoom, regions);
+            if (nbTiles < 10000) {
+                console.log("Will be saving: " + nbTiles + " tiles")
+
+                offlineLayer.saveRegions(regions, offlineLayer.options.maxZoom, 
+                  function(){
+                    console.log('[saveRegions] onStarted');
+
+                  },
+                  function(){
+                    console.log('[saveRegions] onSuccess');
+                    $("#log").text('Done Loading OSM Regions')
+                  },
+                  function(error){
+                    console.log('onError');
+                    console.log(error);
+                  })
+
+                noaaLayer.saveRegions(regions, noaaLayer.options.maxZoom, 
+                  function(){
+                    console.log('[saveRegions] onStarted');
+
+                  },
+                  function(){
+                    console.log('[saveRegions] onSuccess');
+                    $("#log").text('Done Loading NOAA Regions')
+                  },
+                  function(error){
+                    console.log('onError');
+                    console.log(error);
+                  })
+
+            } else {
+                alert("You are trying to save " + nbTiles + " tiles. There is currently a limit of 10,000 tiles.");
+            }
+
+        } // End load regions
+        
+        clearTiles = function(){
+            $("#log").text('clearing tiles...');
+            offlineLayer.clearTiles(
+                function(){
+                    console.log('[clearTiles] success')
+                    $("#log").text('done clearing tiles');
+                },function(error) {
+                    console.log('[clearTiles] fail')
+
+                }
+            );
+
+            noaaLayer.clearTiles(
+                function(){
+                    console.log('[clearTiles] success')
+                    $("#log").text('done clearing tiles');
+                },function(error) {
+                    console.log('[clearTiles] fail')
+
+                }
+            );
+
+        };
+
+        
+        showNewMap = function(){
+            $("#map").hide();
+            if (!newMap) {
+                var newMap = L.map('new-map', {
+                    center: [40.0, -124],
+                    zoom: 10,
+                    //layers: [offlineLayer, noaaLayer]
+                })
+            
+            }
+
+            onReady = function(){
+                console.log("[newMap offlineLayer onReady()] ");
+            }
+
+            onError = function(errorType, errorData1, errorData2){
+                /*
+                    Fires when offlineLayer errors out during tile caching.
+                */
+                console.log("[newMap offlineLayer onError()] ");
+                console.log(errorType)
+                console.log(errorData1)
+                console.log(errorData2)
+            }
+
+            var options = { 
+                map: newMap,
+                maxZoom: 13, 
+                attribution: mapquestAttrib, 
+                subdomains: subDomains,
+                dbOnly: true, 
+                onReady: onReady, 
+                onError: onError, 
+                storeName:"OSMTiles", 
+                dbOption:"WebSQL"
+            }
+            
+            newLayer = new OfflineLayer( mapquestUrl, options)
+            newLayer.addTo(newMap);
+            
+            var options = { 
+                map: newMap,
+                maxZoom: 12, 
+                attribution: mapquestAttrib, 
+                //subdomains: subDomains,
+                dbOnly: true, 
+                onReady: onReady, 
+                onError: onError, 
+                storeName:"NOAATiles", 
+                dbOption:"IndexedDB"
+            }
+            noaaLayer = new OfflineLayer( noaaUrl, options);
+            noaaLayer.addTo(newMap);
+            
+            var baseMaps = {
+                "OSM": offlineLayer,
+                "NOAA": noaaLayer,
+            };
+            L.control.layers(baseMaps).addTo(newMap);
+            newMap.addEventListener('mousemove', function(event){
+                $("#position").text(event.latlng.toString());
+            })
+            
+        }    
+
+
+        
+      });
+    </script>
+</body>
+</html>

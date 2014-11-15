@@ -14,10 +14,11 @@ ImageRetriever = require './ImageRetriever'
 module.exports = class OfflineLayer extends L.TileLayer
   initialize: (url, options) ->
     L.TileLayer.prototype.initialize.call(this, url, options)
-
+    @_map = options['map']
     @_onReady = options["onReady"]
     @_onError = options["onError"]
     dbOption = options["dbOption"]
+    @_dbOnly = options["dbOnly"] # Boolean, if true only show tile that are cached in the DB.
     storeName = options["storeName"] || 'OfflineLeafletTileImages'
     @_tileImagesStore = null
     @_minZoomLevel = 12
@@ -78,6 +79,8 @@ module.exports = class OfflineLayer extends L.TileLayer
 
   # look at the code from L.TileLayer for more details
   _loadTile: (tile, tilePoint) ->
+      if not @_dbOnly == true
+      @_dbOnly = false;
     if not @_tileImagesStore
       return L.TileLayer.prototype._loadTile.call(this, tile, tilePoint)
 
@@ -92,16 +95,17 @@ module.exports = class OfflineLayer extends L.TileLayer
       if dbEntry
         # if the tile has been cached, use the stored Base64 value
         @_setUpTile(tile, key, dbEntry.image)
-      else
+      else 
         # query the map provider for the tile
-        @_setUpTile(tile, key, @getTileUrl(tilePoint))
+        if not @_dbOnly 
+          @_setUpTile(tile, key, @getTileUrl(tilePoint))
 
     onError = () =>
       # Error while getting the key from the DB
       # will get the tile from the map provider
-      @_setUpTile(tile, key, @getTileUrl(tilePoint))
+      if not @_dbOnly
+        @_setUpTile(tile, key, @getTileUrl(tilePoint))
       @_reportError("DB_GET", key)
-
     key = @_createTileKey(tilePoint.x, tilePoint.y, tilePoint.z)
     # Look for the tile in the DB
     @_tileImagesStore.get(key, onSuccess, onError)
@@ -131,13 +135,20 @@ module.exports = class OfflineLayer extends L.TileLayer
     )
 
   # calculateNbTiles includes potentially already saved tiles.
-  calculateNbTiles: (zoomLevelLimit) ->
+  calculateNbTiles: (zoomLevelLimit, regions) ->
+
     if @_map.getZoom() < @_minZoomLevel
       @_reportError("ZOOM_LEVEL_TOO_LOW")
       return -1
 
     count = 0
-    tileImagesToQuery = @_getTileImages(zoomLevelLimit)
+    if regions
+        tileImagesToQuery = @_getTilesByRegion(zoomLevelLimit, regions)
+    else
+        tileImagesToQuery = @_getTileImages(zoomLevelLimit)
+
+    
+    
     for key of tileImagesToQuery
       count++
     return count
@@ -192,6 +203,10 @@ module.exports = class OfflineLayer extends L.TileLayer
       @_getZoomedOutTiles(x, y, startingZoom, 0, tileImagesToQuery, minY, maxY, minX, maxX)
 
     return tileImagesToQuery
+    
+
+    
+
 
   # saves the tiles currently on screen + lower and higher zoom levels.
   saveTiles: (zoomLevelLimit, onStarted, onSuccess, onError) ->
@@ -217,8 +232,110 @@ module.exports = class OfflineLayer extends L.TileLayer
       onError(error)
     )
 
+
+ 
+  _getTilesByRegion: (zoomLevelLimit, regions) ->
+    # Returns tiles that are gotten from the defined regions.
+    # Regions are boxes defined by lat and lng.
+    # Params:
+    #   - zoomLevelLimit: [Integer] the maximum zoom level to use in caching images.
+    #   - regions: [Array] An array of objects. Each object defines a regions as follows
+    #      {
+    #       name:'',
+    #       nLat:,
+    #       sLat:,
+    #       wLng:,
+    #       eLng:
+    #      }
+    # }
+    console.log('[_getTilesByRegion()]');
+    zoomLevelLimit = zoomLevelLimit || @_map.getMaxZoom()
+    startingZoom = 12
+    tileImagesToQuery = {}
+    tileSize = @_getTileSize()
+    boundsORG = @_map.getPixel
+
+    for region in regions
+      console.log('[_getTilesByRegion()] Processing '+region.name)
+      # Get the bounds of the region
+      sw = L.latLng(region.sLat, region.wLng)
+      ne = L.latLng(region.nLat, region.eLng)
+
+      # Compute the bounds (these are in tile coordinates, not lat/lng)
+      psw = L.point(@_map.project(sw, startingZoom).x, @_map.project(sw, startingZoom).y);
+      pne = L.point(@_map.project(ne, startingZoom).x, @_map.project(ne, startingZoom).y); 
+      bounds = L.bounds(psw, pne);
+
+      roundedTileBounds = L.bounds(
+        bounds.min.divideBy(tileSize)._floor(),
+        bounds.max.divideBy(tileSize)._floor()
+      )
+
+      console.log('[_getTilesByRegion()] roundedTileBounds');
+      console.log(roundedTileBounds.min);
+      console.log(roundedTileBounds.max);
+      tilesInScreen = []
+
+      for j in [roundedTileBounds.min.y .. roundedTileBounds.max.y]
+        for i in [roundedTileBounds.min.x .. roundedTileBounds.max.x]
+          tilesInScreen.push(new L.Point(i, j))
+
+      # We will use the exact bound values to test if sub tiles are still inside these bounds.
+      # The idea is to avoid caching images outside the screen.
+
+      tileBounds = L.bounds(
+        bounds.min.divideBy(tileSize),
+        bounds.max.divideBy(tileSize)
+      )
+      minY = tileBounds.min.y
+      maxY = tileBounds.max.y
+      minX = tileBounds.min.x
+      maxX = tileBounds.max.x
+
+
+      arrayLength = tilesInScreen.length
+      console.log('[_getTilesByRegion()] arrayLength = ' + arrayLength)
+      for i in [0 ... arrayLength]
+        point = tilesInScreen[i]
+        x = point.x
+        y = point.y
+        @_getZoomedInTiles(x, y, startingZoom, zoomLevelLimit, tileImagesToQuery, minY, maxY, minX, maxX)
+        @_getZoomedOutTiles(x, y, startingZoom, 0, tileImagesToQuery, minY, maxY, minX, maxX)
+
+    return tileImagesToQuery
+
+
+    # saves the tiles currently on screen + lower and higher zoom levels.
+  saveRegions: (regions, zoomLevelLimit, onStarted, onSuccess, onError) ->
+    console.log('[saveRegions()]');
+    if(!@_tileImagesStore)
+      @_reportError("NO_DB", "No DB available")
+      onError("No DB available")
+      return
+
+    if(@isBusy())
+      @_reportError("SYSTEM_BUSY", "system is busy.")
+      onError("system is busy.")
+      return
+
+    if @_map.getZoom() < @_minZoomLevel
+      @_reportError("ZOOM_LEVEL_TOO_LOW")
+      onError("ZOOM_LEVEL_TOO_LOW")
+      return
+
+    #lock UI
+    tileImagesToQuery = @_getTilesByRegion(zoomLevelLimit, regions)
+    console.log('[saveRegions] tileImagesToQuery')
+    console.log(tileImagesToQuery)
+    @_tileImagesStore.saveImages(tileImagesToQuery, onStarted, onSuccess, (error) =>
+      @_reportError("SAVING_TILES", error)
+      onError(error)
+    )
+
+
   # returns all the tiles with higher zoom levels
   _getZoomedInTiles: (x, y, currentZ, maxZ, tileImagesToQuery, minY, maxY, minX, maxX) ->
+    
     @_getTileImage(x, y, currentZ, tileImagesToQuery, minY, maxY, minX, maxX, true)
 
     if currentZ < maxZ
@@ -253,6 +370,7 @@ module.exports = class OfflineLayer extends L.TileLayer
     # At this point, we only add the image to a "dictionary"
     # This is being done to avoid multiple requests when zooming out, since zooming int should never overlap
     key = @_createTileKey(x, y, z)
+
     if(!tileImagesToQuery[key])
       tileImagesToQuery[key] = {key:key, x: x, y: y, z: z}
 
