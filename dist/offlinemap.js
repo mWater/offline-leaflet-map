@@ -1124,8 +1124,8 @@
 
 }());
 
-}).call(this,require("UYZiDK"))
-},{"UYZiDK":2}],2:[function(require,module,exports){
+}).call(this,require("/home/clayton/dev/mWater/offline-leaflet-map/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
+},{"/home/clayton/dev/mWater/offline-leaflet-map/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":2}],2:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -1173,11 +1173,8 @@ process.argv = [];
 function noop() {}
 
 process.on = noop;
-process.addListener = noop;
 process.once = noop;
 process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
 process.emit = noop;
 
 process.binding = function (name) {
