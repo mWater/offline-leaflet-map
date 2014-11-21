@@ -15,6 +15,7 @@ module.exports = class OfflineLayer extends L.TileLayer
   initialize: (url, options) ->
     L.TileLayer.prototype.initialize.call(this, url, options)
 
+    @_alreadyReportedErrorForThisActions = false
     @_onReady = options["onReady"]
     @_onError = options["onError"]
     dbOption = options["dbOption"]
@@ -74,7 +75,9 @@ module.exports = class OfflineLayer extends L.TileLayer
 
   _reportError: (errorType, errorData) ->
     if @_onError
-      @_onError(errorType, errorData)
+      if not @_alreadyReportedErrorForThisActions
+        @_alreadyReportedErrorForThisActions = true
+        @_onError(errorType, errorData)
 
   # look at the code from L.TileLayer for more details
   _loadTile: (tile, tilePoint) ->
@@ -195,6 +198,8 @@ module.exports = class OfflineLayer extends L.TileLayer
 
   # saves the tiles currently on screen + lower and higher zoom levels.
   saveTiles: (zoomLevelLimit, onStarted, onSuccess, onError) ->
+    @_alreadyReportedErrorForThisActions = false
+
     if(!@_tileImagesStore)
       @_reportError("NO_DB", "No DB available")
       onError("No DB available")

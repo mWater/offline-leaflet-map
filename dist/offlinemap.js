@@ -1124,8 +1124,8 @@
 
 }());
 
-}).call(this,require("/home/clayton/dev/mWater/offline-leaflet-map/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"))
-},{"/home/clayton/dev/mWater/offline-leaflet-map/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":2}],2:[function(require,module,exports){
+}).call(this,require("UYZiDK"))
+},{"UYZiDK":2}],2:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -1173,8 +1173,11 @@ process.argv = [];
 function noop() {}
 
 process.on = noop;
+process.addListener = noop;
 process.once = noop;
 process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
 process.emit = noop;
 
 process.binding = function (name) {
@@ -2757,6 +2760,7 @@ module.exports = OfflineLayer = (function(_super) {
   OfflineLayer.prototype.initialize = function(url, options) {
     var dbOption, err, imageRetriever, storeName, useWebSQL;
     L.TileLayer.prototype.initialize.call(this, url, options);
+    this._alreadyReportedErrorForThisActions = false;
     this._onReady = options["onReady"];
     this._onError = options["onError"];
     dbOption = options["dbOption"];
@@ -2819,7 +2823,10 @@ module.exports = OfflineLayer = (function(_super) {
 
   OfflineLayer.prototype._reportError = function(errorType, errorData) {
     if (this._onError) {
-      return this._onError(errorType, errorData);
+      if (!this._alreadyReportedErrorForThisActions) {
+        this._alreadyReportedErrorForThisActions = true;
+        return this._onError(errorType, errorData);
+      }
     }
   };
 
@@ -2935,6 +2942,7 @@ module.exports = OfflineLayer = (function(_super) {
 
   OfflineLayer.prototype.saveTiles = function(zoomLevelLimit, onStarted, onSuccess, onError) {
     var tileImagesToQuery;
+    this._alreadyReportedErrorForThisActions = false;
     if (!this._tileImagesStore) {
       this._reportError("NO_DB", "No DB available");
       onError("No DB available");
