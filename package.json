@@ -1,6 +1,6 @@
 {
   "name": "offline-leaflet-map",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A Leaflet TileLayer with offline capabilities.",
   "main": "lib/index.js",
   "scripts": {
