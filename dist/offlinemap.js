@@ -3126,7 +3126,7 @@ var WebSQLDataStorage;
 module.exports = WebSQLDataStorage = (function() {
   function WebSQLDataStorage(storeName, onReady, onError) {
     this._storeName = storeName;
-    this._webSQLDB = openDatabase('OfflineTileImages', '1.0', 'Store tile images for OfflineLeaftMap', 50 * 1024 * 1024);
+    this._webSQLDB = openDatabase('OfflineTileImages', '1.0', 'Store tile images for OfflineLeaftMap', 40 * 1024 * 1024);
     this._webSQLDB.transaction((function(_this) {
       return function(tx) {
         return tx.executeSql("CREATE TABLE IF NOT EXISTS " + _this._storeName + " (key unique, image)");
