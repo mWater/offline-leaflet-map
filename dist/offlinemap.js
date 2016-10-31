@@ -2913,7 +2913,7 @@ module.exports = OfflineLayer = (function(_super) {
     map = this._map;
     startingZoom = map.getZoom();
     bounds = map.getPixelBounds();
-    tileSize = this._getTileSize();
+    tileSize = this._getTileSize ? this._getTileSize() : this.getTileSize().x;
     roundedTileBounds = L.bounds(bounds.min.divideBy(tileSize)._floor(), bounds.max.divideBy(tileSize)._floor());
     tilesInScreen = [];
     for (j = _i = _ref = roundedTileBounds.min.y, _ref1 = roundedTileBounds.max.y; _ref <= _ref1 ? _i <= _ref1 : _i >= _ref1; j = _ref <= _ref1 ? ++_i : --_i) {
