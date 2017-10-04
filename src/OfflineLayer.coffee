@@ -161,7 +161,8 @@ module.exports = class OfflineLayer extends L.TileLayer
     map = @_map
     startingZoom = map.getZoom()
     bounds = map.getPixelBounds()
-    tileSize = @_getTileSize()
+    # Handle both Leaflet 0.7 (_getTileSize) and 1.0
+    tileSize = if @_getTileSize then @_getTileSize() else @getTileSize().x
 
     # bounds are rounded down since a tile cover all the pixels from it's rounded down value until the next tile
     roundedTileBounds = L.bounds(
@@ -284,5 +285,24 @@ module.exports = class OfflineLayer extends L.TileLayer
     tilePoint = @_createNormalizedTilePoint(x, y, z)
     return tilePoint.x + ", " + tilePoint.y + ", " + tilePoint.z
 
+  # Override
+  # The parent one does not care about the z parameter being passed
+  getTileUrl: (coords) ->
+    data = {
+      r: L.Browser.retina ? '@2x' : '',
+      s: @_getSubdomain(coords),
+      x: coords.x,
+      y: coords.y,
+      z: coords.z or @_getZoomForUrl()
+    }
+
+    if @_map and not @_map.options.crs.infinite
+      invertedY = @_globalTileRange.max.y - coords.y
+      if @options.tms
+        data['y'] = invertedY
+      
+      data['-y'] = invertedY
+    
+    L.Util.template(@_url, L.extend(data, @options));
 
 
