@@ -3039,6 +3039,27 @@ module.exports = OfflineLayer = (function(_super) {
     return tilePoint.x + ", " + tilePoint.y + ", " + tilePoint.z;
   };
 
+  OfflineLayer.prototype.getTileUrl = function(coords) {
+    var data, invertedY, _ref;
+    data = {
+      r: (_ref = L.Browser.retina) != null ? _ref : {
+        '@2x': '',
+        s: this._getSubdomain(coords),
+        x: coords.x,
+        y: coords.y,
+        z: coords.z || this._getZoomForUrl()
+      }
+    };
+    if (this._map && !this._map.options.crs.infinite) {
+      invertedY = this._globalTileRange.max.y - coords.y;
+      if (this.options.tms) {
+        data['y'] = invertedY;
+      }
+      data['-y'] = invertedY;
+    }
+    return L.Util.template(this._url, L.extend(data, this.options));
+  };
+
   return OfflineLayer;
 
 })(L.TileLayer);
