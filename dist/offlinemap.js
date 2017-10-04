@@ -3040,15 +3040,13 @@ module.exports = OfflineLayer = (function(_super) {
   };
 
   OfflineLayer.prototype.getTileUrl = function(coords) {
-    var data, invertedY, _ref;
+    var data, invertedY;
     data = {
-      r: (_ref = L.Browser.retina) != null ? _ref : {
-        '@2x': '',
-        s: this._getSubdomain(coords),
-        x: coords.x,
-        y: coords.y,
-        z: coords.z || this._getZoomForUrl()
-      }
+      r: L.Browser.retina ? '@2x' : '',
+      s: this._getSubdomain(coords),
+      x: coords.x,
+      y: coords.y,
+      z: coords.z || this._getZoomForUrl()
     };
     if (this._map && !this._map.options.crs.infinite) {
       invertedY = this._globalTileRange.max.y - coords.y;
