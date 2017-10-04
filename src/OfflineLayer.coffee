@@ -289,7 +289,7 @@ module.exports = class OfflineLayer extends L.TileLayer
   # The parent one does not care about the z parameter being passed
   getTileUrl: (coords) ->
     data = {
-      r: L.Browser.retina ? '@2x' : '',
+      r: if L.Browser.retina then '@2x' else '',
       s: @_getSubdomain(coords),
       x: coords.x,
       y: coords.y,
