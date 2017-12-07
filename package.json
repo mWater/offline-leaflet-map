@@ -14,7 +14,7 @@
   },
   "repository": "https://github.com/mWater/offline-leaflet-map",
   "author": "Mathieu Briau",
-  "license": "GPLv3",
+  "license": "LGPL-3.0",
   "devDependencies": {
     "browserify": "^3.40.0",
     "chai": "^1.9.1",
