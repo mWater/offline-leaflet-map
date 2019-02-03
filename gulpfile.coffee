@@ -13,13 +13,6 @@ gulp.task 'coffee', () ->
   .pipe(coffee({ bare: true }).on('error', gutil.log))
   .pipe(gulp.dest('./lib/'))
 
-gulp.task 'prepareTests', ['build'], () ->
-  bundler = browserify({entries: glob.sync("./test/*Tests.coffee"), extensions: [".coffee"] })
-  stream = bundler.bundle()
-    .pipe(streamConvert('browserified.js'))
-    .pipe(gulp.dest('./test'))
-  return stream
-
 gulp.task 'demo', () ->
   bundler = browserify("./demo.coffee",
     extensions: [".coffee"]
@@ -28,17 +21,26 @@ gulp.task 'demo', () ->
     .pipe(streamConvert('bundle.js'))
     .pipe(gulp.dest("./demo/"))
 
-gulp.task 'standalone', () ->
-  bundler = browserify("./standalone.coffee",
-    extensions: [".coffee"]
-    basedir: "./src/")
-  bundler.bundle()
-    .pipe(streamConvert('offlinemap.js'))
-    .pipe(gulp.dest("./dist/"))
-    .pipe(buffer())
-    .pipe(rename("offlinemap.min.js"))
-    .pipe(uglify())
-    .pipe(gulp.dest('./dist/'))
+# gulp.task 'standalone', () ->
+#   bundler = browserify("./standalone.coffee",
+#     extensions: [".coffee"]
+#     basedir: "./src/")
+#   bundler.bundle()
+#     .pipe(streamConvert('offlinemap.js'))
+#     .pipe(gulp.dest("./dist/"))
+    # .pipe(buffer())
+    # .pipe(rename("offlinemap.min.js"))
+    # .pipe(uglify())
+    # .pipe(gulp.dest('./dist/'))
 
-gulp.task 'build', ['coffee', 'demo', 'standalone']
-gulp.task 'default', ['build']
+gulp.task 'build', gulp.series(['coffee'])#, 'demo']), 'standalone'])
+
+gulp.task 'prepareTests', gulp.series('build', () ->
+  bundler = browserify({entries: glob.sync("./test/*Tests.coffee"), extensions: [".coffee"] })
+  stream = bundler.bundle()
+    .pipe(streamConvert('browserified.js'))
+    .pipe(gulp.dest('./test'))
+  return stream
+)
+
+gulp.task 'default', gulp.series(['build'])
