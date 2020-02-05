@@ -159,7 +159,7 @@ module.exports = class OfflineLayer extends L.TileLayer
     tileImagesToQuery = {}
 
     map = @_map
-    startingZoom = map.getZoom()
+    startingZoom = Math.min(map.getZoom(), zoomLevelLimit)
     bounds = map.getPixelBounds()
     # Handle both Leaflet 0.7 (_getTileSize) and 1.0
     tileSize = if @_getTileSize then @_getTileSize() else @getTileSize().x
