@@ -1,3 +1,5 @@
+# THIS PACKAGE IS NO LONGER MAINTAINED!
+
 offline-leaflet-map
 ============
 
