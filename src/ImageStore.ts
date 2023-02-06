@@ -5,16 +5,31 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
  */
-import async from 'async'
+import async, {QueueObject} from 'async'
 import IndexedDBDataStorage from './IndexedDBDataStorage'
 import WebSQLDataStorage from './WebSQLDataStorage'
+import {Evented} from 'leaflet'
+import ImageRetriever from './ImageRetriever';
+import { DataStorage, SuccessCallback, ErrorCallback } from './types';
+import OfflineLayer from './OfflineLayer';
 
 // Saves and stores images using either Web SQL or IndexedDB
 // Uses an async queue and can be canceled
 // Will emit events while the saving of images is in progress
 
 class ImageStore {
-  constructor(eventEmitter, imageRetriever) {
+  private _eventEmitter: Evented & Pick<OfflineLayer, "_reportError">
+  private _nbTilesLeftToSave: number
+  private _nbImagesCurrentlyBeingRetrieved: number
+  private _imageRetriever: ImageRetriever
+  private _beingCanceled: boolean
+  private _running: boolean
+  private _myQueue: QueueObject<any> | null
+  private storage: DataStorage
+
+  private _onSaveImagesSuccess?: SuccessCallback
+
+  constructor(eventEmitter:Evented & Pick<OfflineLayer, "_reportError">, imageRetriever: ImageRetriever) {
     if ((imageRetriever == null)) {
       throw new Error('the image store needs an imageRetriever');
     }
@@ -31,7 +46,7 @@ class ImageStore {
     this._running = false;
   }
 
-  createDB(storeName, onReady, onError, useWebSQL) {
+  createDB(storeName: string, onReady:() => void, onError: ErrorCallback, useWebSQL: boolean) {
     const _useWebSQL = useWebSQL;
     if ((onReady == null)) {
       throw new Error('This async function needs a callback');
@@ -57,7 +72,7 @@ class ImageStore {
     if (this._myQueue != null) {
       this._myQueue.kill();
       if (this._nbImagesCurrentlyBeingRetrieved === 0) {
-        this._finish();
+        this._finish(null);
       }
       return true;
     }
@@ -68,34 +83,34 @@ class ImageStore {
     return this._running;
   }
 
-  get(key, onSuccess, onError) {
+  get(key: string, onSuccess: SuccessCallback, onError: ErrorCallback) {
     if ((onSuccess == null) || (onError == null)) {
       throw new Error('This async function needs callbacks');
     }
     return this.storage.get(key, onSuccess, onError);
   }
 
-  clear(onSuccess, onError) {
+  clear(onSuccess: SuccessCallback, onError: ErrorCallback) {
     if ((onSuccess == null) || (onError == null)) {
       throw new Error('This async function needs callbacks');
     }
     return this.storage.clear(onSuccess, onError);
   }
 
-  _finish(error, onError) {
+  _finish(error?: any, onError?: ErrorCallback) {
     this._running = false;
     this._beingCanceled = false;
     this._eventEmitter.fire('tilecachingprogressdone', null);
     this._myQueue = null;
     this._nbImagesCurrentlyBeingRetrieved = 0;
-    if (error != null) {
-      return onError(error);
+    if (error && error !== null && onError) {
+      onError(error);
     } else {
-      return this._onSaveImagesSuccess();
+      this._onSaveImagesSuccess && this._onSaveImagesSuccess();
     }
   }
 
-  saveImages(tileImagesToQuery, onStarted, onSuccess, onError) {
+  saveImages(tileImagesToQuery, onStarted: () => void, onSuccess: SuccessCallback, onError: ErrorCallback) {
     this._running = true;
     if (this._myQueue != null) {
       throw new Error('Not allowed to save images while saving is already in progress');
@@ -105,7 +120,7 @@ class ImageStore {
     }
     this._onSaveImagesSuccess = onSuccess;
 
-    return this._getImagesNotInDB(tileImagesToQuery,
+    this._getImagesNotInDB(tileImagesToQuery,
       tileInfoOfImagesNotInDB => {
         if (!this._beingCanceled && (tileInfoOfImagesNotInDB != null) && (tileInfoOfImagesNotInDB.length > 0)) {
           const MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8;
@@ -122,7 +137,7 @@ class ImageStore {
         } else {
           //nothing to do
           onStarted();
-          return this._finish();
+          this._finish();
         }
       }
       ,
@@ -181,7 +196,7 @@ class ImageStore {
       });
     };
 
-    const errorGettingImage = (errorType, errorData) => {
+    const errorGettingImage = (errorType: string, errorData: Error) => {
       this._decrementNbTilesLeftToSave();
       this._eventEmitter._reportError(errorType, {data: errorData, tileInfo: data.tileInfo});
       return callback(errorType);
@@ -192,7 +207,7 @@ class ImageStore {
   }
 
   // called when the total number of tiles is known
-  _updateTotalNbImagesLeftToSave(nbTiles) {
+  _updateTotalNbImagesLeftToSave(nbTiles: number) {
     this._nbTilesLeftToSave = nbTiles;
     return this._eventEmitter.fire('tilecachingprogressstart', {nbTiles: this._nbTilesLeftToSave});
   }

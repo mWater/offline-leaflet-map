@@ -1,6 +1,7 @@
 import ImageStore from './ImageStore'
 import ImageRetriever from './ImageRetriever'
 import { TileLayer, TileLayerOptions } from 'leaflet'
+import { ErrorCallback, SuccessCallback } from './types'
 
 // Main class of the project
 // By default, it behaves just like a L.TileLayer. If the dbOption is set to WebSQL or IndexedDB, it creates
@@ -14,7 +15,7 @@ import { TileLayer, TileLayerOptions } from 'leaflet'
 
 type OfflineLayerOptions = {
   onReady: () => void
-  onError: (code: string, message?: string, message1?: string) => void
+  onError: (code: string, message?: Error, message1?: string) => void
   dbOption: string
   storeName?: string
 } & TileLayerOptions
@@ -23,8 +24,8 @@ class OfflineLayer extends TileLayer {
 
   private _alreadyReportedErrorForThisActions: boolean
   private _onReady: () => void
-  private _onError: (code: string, message: string) => void
-  private _tileImagesStore: any
+  private _onError: (code: string, error: Error) => void
+  private _tileImagesStore: null | ImageStore
   private _minZoomLevel: number
 
   constructor(urlTemplate: string, options: OfflineLayerOptions) {
@@ -50,6 +51,7 @@ class OfflineLayer extends TileLayer {
           useWebSQL = false;
         } else {
           this._onError("COULD_NOT_CREATE_DB", "Invalid dbOption parameter: " + dbOption);
+          return
         }
 
         // Create the DB store and then call the @_onReady callback
@@ -97,7 +99,7 @@ class OfflineLayer extends TileLayer {
     );
   }
 
-  _reportError(errorType: string, errorData: string) {
+  _reportError(errorType: string, errorData?: any) {
     if (this._onError) {
       if (!this._alreadyReportedErrorForThisActions) {
         this._alreadyReportedErrorForThisActions = true;
@@ -119,7 +121,7 @@ class OfflineLayer extends TileLayer {
     tile.onload = this._tileOnLoad;
     // Done reproducing _loadTile
 
-    const onSuccess = dbEntry => {
+    const onSuccess = (dbEntry: any) => {
       if (dbEntry) {
         // if the tile has been cached, use the stored Base64 value
         return this._setUpTile(tile, key, dbEntry.image);
@@ -152,7 +154,7 @@ class OfflineLayer extends TileLayer {
     return false;
   }
 
-  clearTiles(onSuccess, onError) {
+  clearTiles(onSuccess: SuccessCallback, onError: ErrorCallback) {
     if(!this.useDB()) {
       this._reportError("NO_DB", "No DB available");
       onError("No DB available");
@@ -165,14 +167,14 @@ class OfflineLayer extends TileLayer {
       return;
     }
 
-    return this._tileImagesStore.clear(onSuccess, error => {
+    this._tileImagesStore?.clear(onSuccess, error => {
       this._reportError("COULD_NOT_CLEAR_DB", error);
-      return onError(error);
+      onError(error);
     });
   }
 
   // calculateNbTiles includes potentially already saved tiles.
-  calculateNbTiles(zoomLevelLimit) {
+  calculateNbTiles(zoomLevelLimit: number) {
     if (this._map.getZoom() < this._minZoomLevel) {
       this._reportError("ZOOM_LEVEL_TOO_LOW");
       return -1;
@@ -186,7 +188,7 @@ class OfflineLayer extends TileLayer {
     return count;
   }
 
-  isBusy() {
+  isBusy(): boolean {
     if (this._tileImagesStore != null) {
       return this._tileImagesStore.isBusy();
     }
@@ -196,7 +198,7 @@ class OfflineLayer extends TileLayer {
   // Returns the tiles currently displayed
   // @_tiles could return tiles that are currently loaded but not displayed
   // that is why the tiles are recalculated here.
-  _getTileImages(zoomLevelLimit) {
+  _getTileImages(zoomLevelLimit: number) {
     let i;
     let asc2, end2;
     zoomLevelLimit = zoomLevelLimit || this._map.getMaxZoom();

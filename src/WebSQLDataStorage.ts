@@ -1,11 +1,18 @@
-import { ErrorCallback, SuccessCallback } from "./types";
+import { DataStorage, ErrorCallback, SuccessCallback } from "./types";
 
-class WebSQLDataStorage {
+class WebSQLDataStorage implements DataStorage{
   private _storeName
   private _webSQLDB: Database
 
+  private _webSqlErrorHandler: (onError: ErrorCallback) => SQLStatementErrorCallback
+
   constructor(storeName: string, onReady: () => void, onError: ErrorCallback, storage?: string) {
     this._storeName = storeName;
+
+    this._webSqlErrorHandler = (onError: ErrorCallback) => (_: SQLTransaction, err: SQLError) => {
+      onError(err)
+      return true
+    }
 
     if (storage === "sqlite" && window["sqlitePlugin"]) { 
       this.initSqlite(onReady, onError)
@@ -32,7 +39,7 @@ class WebSQLDataStorage {
 
   get(key: string, onSuccess: SuccessCallback, onError: ErrorCallback) {
     this._webSQLDB.transaction(tx => {
-      const onSQLSuccess = function(tx, results) {
+      const onSQLSuccess = function(_: any, results: any) {
         const len = results.rows.length;
         if (len === 0) {
           onSuccess(undefined);
@@ -43,19 +50,19 @@ class WebSQLDataStorage {
         }
       };
 
-      tx.executeSql(`SELECT * FROM ${this._storeName} WHERE key='${key}'`, [], onSQLSuccess, onError);
+      tx.executeSql(`SELECT * FROM ${this._storeName} WHERE key='${key}'`, [], onSQLSuccess, this._webSqlErrorHandler(onError));
     });
   }
 
   clear(onSuccess: SuccessCallback, onError: ErrorCallback) {
     this._webSQLDB.transaction(tx => {
-      tx.executeSql(`DELETE FROM ${this._storeName}`, [], onSuccess, onError);
+      tx.executeSql(`DELETE FROM ${this._storeName}`, [], onSuccess, this._webSqlErrorHandler(onError));
     });
   }
 
   put(key: string, object: any, onSuccess: SuccessCallback, onError: ErrorCallback) {
     this._webSQLDB.transaction(tx => {
-      tx.executeSql(`INSERT OR REPLACE INTO ${this._storeName} VALUES (?, ?)`, [key, object.image], onSuccess, onError);
+      tx.executeSql(`INSERT OR REPLACE INTO ${this._storeName} VALUES (?, ?)`, [key, object.image], onSuccess, this._webSqlErrorHandler(onError));
     });
   }
 
@@ -82,7 +89,7 @@ class WebSQLDataStorage {
       }
       const keys = tileImagesToQueryArray2.join(',');
 
-      const onSQLSuccess = function(tx, results) {
+      const onSQLSuccess = function(_: any, results: any) {
         let asc1, end1;
         for (i = 0, end1 = results.rows.length, asc1 = 0 <= end1; asc1 ? i < end1 : i > end1; asc1 ? i++ : i--) {
           var item = results.rows.item(i);
@@ -95,7 +102,7 @@ class WebSQLDataStorage {
         onSuccess(result);
       };
 
-      tx.executeSql(`SELECT * FROM ${this._storeName} WHERE key IN (${keys})`, [], onSQLSuccess, onError);
+      tx.executeSql(`SELECT * FROM ${this._storeName} WHERE key IN (${keys})`, [], onSQLSuccess, this._webSqlErrorHandler(onError));
     });
   }
 }
