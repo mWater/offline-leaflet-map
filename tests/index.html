@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Mocha</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mocha/10.2.0/mocha.css" integrity="sha512-SjDc34mGAkSBKnNMasz1QPVustFyPQUHUO5wxzGNC5x9wQMcHwDHXCNRYowC/6DsX0lqvpCI1mKiVEQkws2olw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mocha/8.0.1/mocha.min.js"></script>
+
+    <script type="module" class="mocha-init">
+        mocha.setup('bdd');
+    </script>
+
+    <!-- ------------------------------------ -->
+    <script type="module" src="index.js"></script>  
+    <!-- ------------------------------------ -->
+
+    <script type="module">
+        mocha.run();
+    </script>
+</head>
+<body>
+    <div id="mocha"></div>
+</body>
+</html>
