@@ -6,6 +6,7 @@
   "scripts": {
     "watch": "node_modules/build-library/watch",
     "test": "npx esbuild tests/index.ts --bundle --outdir=tests --external:mocha",
+    "build": "node_modules/build-library/build",
     "prepublishOnly": "gulp"
   },
   "browserify": {

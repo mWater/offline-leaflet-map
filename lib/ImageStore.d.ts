@@ -1,0 +1,30 @@
+import IndexedDBDataStorage from './IndexedDBDataStorage';
+import WebSQLDataStorage from './WebSQLDataStorage';
+import { Evented } from 'leaflet';
+import ImageRetriever from './ImageRetriever';
+import { SuccessCallback, ErrorCallback } from './types';
+import OfflineLayer from './OfflineLayer';
+declare class ImageStore {
+    private _eventEmitter;
+    private _nbTilesLeftToSave;
+    private _nbImagesCurrentlyBeingRetrieved;
+    private _imageRetriever;
+    private _beingCanceled;
+    private _running;
+    private _myQueue;
+    private storage;
+    private _onSaveImagesSuccess?;
+    constructor(eventEmitter: Evented & Pick<OfflineLayer, "_reportError">, imageRetriever: ImageRetriever);
+    createDB(storeName: string, onReady: () => void, onError: ErrorCallback, useWebSQL: boolean): IndexedDBDataStorage | WebSQLDataStorage;
+    cancel(): boolean;
+    isBusy(): boolean;
+    get(key: string, onSuccess: SuccessCallback, onError: ErrorCallback): any;
+    clear(onSuccess: SuccessCallback, onError: ErrorCallback): void;
+    _finish(error?: any, onError?: ErrorCallback): void;
+    saveImages(tileImagesToQuery: any, onStarted: () => void, onSuccess: SuccessCallback, onError: ErrorCallback): void;
+    _getImagesNotInDB(tileImagesToQuery: any, callback: any, onError: any): any;
+    _saveTile(data: any, callback: any): void;
+    _updateTotalNbImagesLeftToSave(nbTiles: number): Evented & Pick<OfflineLayer, "_reportError">;
+    _decrementNbTilesLeftToSave(): void;
+}
+export default ImageStore;
