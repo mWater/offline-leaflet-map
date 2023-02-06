@@ -6,7 +6,7 @@ class WebSQLDataStorage implements DataStorage{
 
   private _webSqlErrorHandler: (onError: ErrorCallback) => SQLStatementErrorCallback
 
-  constructor(storeName: string, onReady: () => void, onError: ErrorCallback, storage?: string) {
+  constructor(storeName: string, onReady: () => void, onError: ErrorCallback) {
     this._storeName = storeName;
 
     this._webSqlErrorHandler = (onError: ErrorCallback) => (_: SQLTransaction, err: SQLError) => {
@@ -14,7 +14,7 @@ class WebSQLDataStorage implements DataStorage{
       return true
     }
 
-    if (storage === "sqlite" && window["sqlitePlugin"]) { 
+    if (window["sqlitePlugin"]) {
       this.initSqlite(onReady, onError)
     } else {
       this._webSQLDB = window.openDatabase('OfflineTileImages', '1.0', 'Store tile images for OfflineLeaftMap', 40 * 1024 * 1024);
