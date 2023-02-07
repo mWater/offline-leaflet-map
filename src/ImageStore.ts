@@ -125,15 +125,15 @@ class ImageStore {
         if (!this._beingCanceled && (tileInfoOfImagesNotInDB != null) && (tileInfoOfImagesNotInDB.length > 0)) {
           const MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8;
           this._myQueue = async.queue((data, callback) => {
-            return this._saveTile(data, callback);
+            this._saveTile(data, callback);
           }
           , MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY);
           this._myQueue.drain = error => {
-            return this._finish(error, onError);
+            this._finish(error, onError);
           };
 
           for (var data of Array.from(tileInfoOfImagesNotInDB)) { this._myQueue.push(data); }
-          return onStarted();
+          onStarted();
         } else {
           //nothing to do
           onStarted();
@@ -152,7 +152,7 @@ class ImageStore {
     }
 
     // Query all the needed tiles from the DB
-    return this.storage.getDenseBatch(tileImagesToQueryArray,
+    this.storage.getDenseBatch(tileImagesToQueryArray,
       tileImages => {
         let i = 0;
         const tileInfoOfImagesNotInDB = [];
@@ -169,13 +169,13 @@ class ImageStore {
             tileInfoOfImagesNotInDB.push({key, tileInfo});
           }
 
-          return i++;
+          i++;
         };
 
         for (var tileImage of Array.from(tileImages)) { testTile(tileImage); }
         this._updateTotalNbImagesLeftToSave(this._nbTilesLeftToSave);
 
-        return callback(tileInfoOfImagesNotInDB);
+        callback(tileInfoOfImagesNotInDB);
       }
       ,
       error => onError(error));
@@ -184,32 +184,32 @@ class ImageStore {
   _saveTile(data, callback) {
     // when the image is received, it is stored inside the DB using Base64 format
     const gettingImage = response => {
-      return this.storage.put(data.key, {"image": response},
+      this.storage.put(data.key, {"image": response},
       () => {
         this._decrementNbTilesLeftToSave();
-        return callback();
+        callback();
       }
       ,
       error => {
         this._decrementNbTilesLeftToSave();
-        return callback(error);
+        callback(error);
       });
     };
 
     const errorGettingImage = (errorType: string, errorData: Error) => {
       this._decrementNbTilesLeftToSave();
       this._eventEmitter._reportError(errorType, {data: errorData, tileInfo: data.tileInfo});
-      return callback(errorType);
+      callback(errorType);
     };
 
     this._nbImagesCurrentlyBeingRetrieved++;
-    return this._imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage);
+    this._imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage);
   }
 
   // called when the total number of tiles is known
   _updateTotalNbImagesLeftToSave(nbTiles: number) {
     this._nbTilesLeftToSave = nbTiles;
-    return this._eventEmitter.fire('tilecachingprogressstart', {nbTiles: this._nbTilesLeftToSave});
+    this._eventEmitter.fire('tilecachingprogressstart', {nbTiles: this._nbTilesLeftToSave});
   }
 
   // called each time a tile as been handled
@@ -222,7 +222,7 @@ class ImageStore {
     // I need to do this so the ImageStore only call finish when everything is done canceling
     this._nbImagesCurrentlyBeingRetrieved--;
     if (this._beingCanceled && (this._nbImagesCurrentlyBeingRetrieved === 0)) {
-      return this._finish();
+      this._finish();
     }
   }
 }

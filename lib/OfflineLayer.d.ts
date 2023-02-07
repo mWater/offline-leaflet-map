@@ -1,4 +1,4 @@
-import { TileLayer, TileLayerOptions } from 'leaflet';
+import { Coords, DoneCallback, TileLayer, TileLayerOptions } from 'leaflet';
 import { ErrorCallback, SuccessCallback } from './types';
 type OfflineLayerOptions = {
     onReady: () => void;
@@ -13,6 +13,7 @@ declare class OfflineLayer extends TileLayer {
     private _tileImagesStore;
     private _minZoomLevel;
     constructor(urlTemplate: string, options: OfflineLayerOptions);
+    protected createTile(coords: Coords, done: DoneCallback): HTMLElement;
     _setUpTile(tile: any, key: string, value: string): this;
     _reportError(errorType: string, errorData?: any): void;
     _loadTile(tile: any, tilePoint: any): any;
@@ -31,13 +32,13 @@ declare class OfflineLayer extends TileLayer {
         y: any;
         z: any;
     } | undefined;
-    _createNormalizedTilePoint(x: any, y: any, z: any): {
-        x: any;
-        y: any;
-        z: any;
+    _createNormalizedTilePoint(x: number, y: number, z: number): {
+        x: number;
+        y: number;
+        z: number;
     };
-    _createURL(x: any, y: any, z: any): string;
-    _createTileKey(x: any, y: any, z: any): string;
-    getTileUrl(coords: any): string;
+    _createURL(x: number, y: number, z: number): string;
+    _createTileKey(x: number, y: number, z: number): string;
+    getTileUrl(coords: Coords): string;
 }
 export default OfflineLayer;

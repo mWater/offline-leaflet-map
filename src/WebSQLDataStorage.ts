@@ -39,6 +39,7 @@ class WebSQLDataStorage implements DataStorage{
 
   get(key: string, onSuccess: SuccessCallback, onError: ErrorCallback) {
     this._webSQLDB.transaction(tx => {
+      const sn = this._storeName
       const onSQLSuccess = function(_: any, results: any) {
         const len = results.rows.length;
         if (len === 0) {

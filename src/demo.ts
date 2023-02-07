@@ -122,7 +122,7 @@ class CacheBtnControl extends Control {
   }
 }
 
-const aMap = map('main').setView([-2.9, -79], 13);
+const aMap = map('main').setView([-2.9, -79], 17);
 
 const onReady = function() {
   console.log(offlineLayer)

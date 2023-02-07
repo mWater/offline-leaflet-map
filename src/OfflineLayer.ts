@@ -1,6 +1,6 @@
 import ImageStore from './ImageStore'
 import ImageRetriever from './ImageRetriever'
-import { TileLayer, TileLayerOptions } from 'leaflet'
+import { extend, Coords, DoneCallback, TileLayer, TileLayerOptions, DomEvent, Util, Browser } from 'leaflet'
 import { ErrorCallback, SuccessCallback } from './types'
 
 // Main class of the project
@@ -86,6 +86,51 @@ class OfflineLayer extends TileLayer {
           this._onReady();
         }, 0);
     }
+  }
+
+  protected createTile(coords: Coords, done: DoneCallback): HTMLElement {
+    if (!this._tileImagesStore) {
+      return super.createTile(coords, done);
+    }
+    const tile = document.createElement('img');
+
+    DomEvent.on(tile, 'load', Util.bind(this._tileOnLoad, this, done, tile));
+    DomEvent.on(tile, 'error', Util.bind(this._tileOnError, this, done, tile));
+
+    if (this.options.crossOrigin || this.options.crossOrigin === '') {
+      tile.crossOrigin =
+        this.options.crossOrigin === true ? '' : this.options.crossOrigin;
+    }
+
+    tile.alt = '';
+
+    tile.setAttribute('role', 'presentation');
+
+    const onSuccess = (dbEntry: any) => {
+      if (dbEntry) {
+        // if the tile has been cached, use the stored Base64 value
+        this._setUpTile(tile, key, dbEntry.image);
+      } else {
+        // query the map provider for the tile
+        this._setUpTile(tile, key, this.getTileUrl(coords));
+      }
+    };
+
+    const onError = () => {
+      // Error while getting the key from the DB
+      // will get the tile from the map provider
+      this._setUpTile(tile, key, this.getTileUrl(coords));
+      this._reportError("DB_GET", key);
+    }
+
+    var key = this._createTileKey(coords.x, coords.y, coords.z)
+    this._tileImagesStore.get(key, onSuccess, onError);
+
+    // this.setDataUrl(coords)
+    //   .then((dataurl: string) => (tile.src = dataurl))
+    //   .catch(() => (tile.src = this.getTileUrl(coords)));
+
+    return tile;
   }
 
   // look at the code from L.TileLayer for more details
@@ -277,9 +322,9 @@ class OfflineLayer extends TileLayer {
 
     //lock UI
     const tileImagesToQuery = this._getTileImages(zoomLevelLimit);
-    return this._tileImagesStore.saveImages(tileImagesToQuery, onStarted, onSuccess, error => {
+    this._tileImagesStore.saveImages(tileImagesToQuery, onStarted, onSuccess, error => {
       this._reportError("SAVING_TILES", error);
-      return onError(error);
+      onError(error);
     });
   }
 
@@ -329,7 +374,7 @@ class OfflineLayer extends TileLayer {
     }
   }
 
-  _createNormalizedTilePoint(x, y, z) {
+  _createNormalizedTilePoint(x: number, y: number, z: number) {
     const nbTilesAtZoomLevel = Math.pow(2, z);
 
     while(x > nbTilesAtZoomLevel) {
@@ -349,21 +394,21 @@ class OfflineLayer extends TileLayer {
     return {x, y, z};
   }
 
-  _createURL(x, y, z) {
+  _createURL(x: number, y: number, z: number) {
     const tilePoint = this._createNormalizedTilePoint(x, y, z);
     return this.getTileUrl(tilePoint);
   }
 
-  _createTileKey(x, y, z) {
+  _createTileKey(x: number, y: number, z: number) {
     const tilePoint = this._createNormalizedTilePoint(x, y, z);
     return tilePoint.x + ", " + tilePoint.y + ", " + tilePoint.z;
   }
 
   // Override
   // The parent one does not care about the z parameter being passed
-  getTileUrl(coords) {
+  getTileUrl(coords: Coords) {
     const data = {
-      r: L.Browser.retina ? '@2x' : '',
+      r: Browser.retina ? '@2x' : '',
       s: this._getSubdomain(coords),
       x: coords.x,
       y: coords.y,
@@ -379,7 +424,7 @@ class OfflineLayer extends TileLayer {
       data['-y'] = invertedY;
     }
     
-    return L.Util.template(this._url, L.extend(data, this.options));
+    return Util.template(this._url, extend(data, this.options));
   }
 }
 

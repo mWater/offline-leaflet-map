@@ -22,9 +22,9 @@ declare class ImageStore {
     clear(onSuccess: SuccessCallback, onError: ErrorCallback): void;
     _finish(error?: any, onError?: ErrorCallback): void;
     saveImages(tileImagesToQuery: any, onStarted: () => void, onSuccess: SuccessCallback, onError: ErrorCallback): void;
-    _getImagesNotInDB(tileImagesToQuery: any, callback: any, onError: any): any;
+    _getImagesNotInDB(tileImagesToQuery: any, callback: any, onError: any): void;
     _saveTile(data: any, callback: any): void;
-    _updateTotalNbImagesLeftToSave(nbTiles: number): Evented & Pick<OfflineLayer, "_reportError">;
+    _updateTotalNbImagesLeftToSave(nbTiles: number): void;
     _decrementNbTilesLeftToSave(): void;
 }
 export default ImageStore;
