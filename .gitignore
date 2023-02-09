@@ -1,6 +1,5 @@
 .idea/
 node_modules/
-test/browserified.js
-demo/bundle.js
+tests/index.js
+tests/index.js.map
 dist/index.js
-

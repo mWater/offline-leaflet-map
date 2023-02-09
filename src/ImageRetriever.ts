@@ -5,27 +5,28 @@
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
  */
 import _ from 'lodash'
-import OfflineLayer from './OfflineLayer';
-import { TileInfo } from './types';
+import OfflineLayer from './OfflineLayer'
+import {TileInfo} from './types'
 // Makes a ajax call to retrieve the image and returns it as Base64
 
 class ImageRetriever {
   private offlineLayer: OfflineLayer
   constructor(offlineLayer: OfflineLayer) {
-    this.offlineLayer = offlineLayer;
+    this.offlineLayer = offlineLayer
   }
 
-  retrieveImage(tileInfo: TileInfo, callback: XMLHttpRequest['response'], error: (code: string, err: any) => void) {
-    const imageUrl = this.offlineLayer._createURL(tileInfo.x, tileInfo.y, tileInfo.z);
+  retrieveImage(
+    tileInfo: TileInfo,
+    callback: (res: XMLHttpRequest['response']) => void,
+    error: (code: string, err: any) => void,
+  ) {
+    const imageUrl = this.offlineLayer._createURL(tileInfo.x, tileInfo.y, tileInfo.z)
 
-    return ajax(imageUrl, response => callback(arrayBufferToBase64ImagePNG(response))
-    , error);
+    return ajax(imageUrl, (response) => callback(arrayBufferToBase64ImagePNG(response)), error)
   }
 }
 
 export default ImageRetriever
-
-
 
 //# The following code was taken from https://github.com/tbicr/OfflineMap
 //# under the MIT License (MIT)
@@ -54,32 +55,36 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 THE SOFTWARE.
 */
 
-var ajax = function(url: string, callback: (res: any) => void, error: (code: string, err: any) => void, queueCallback?: any) {
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
-  xhr.responseType = 'arraybuffer';
-  xhr.onload = function(err) {
+var ajax = function (
+  url: string,
+  callback: (res: any) => void,
+  error: (code: string, err: any) => void,
+  queueCallback?: any,
+) {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', url, true)
+  xhr.responseType = 'arraybuffer'
+  xhr.onload = function (err) {
     if (this.status === 200) {
-      return callback(this.response);
+      return callback(this.response)
     } else {
-      return error("GET_STATUS_ERROR", err);
+      return error('GET_STATUS_ERROR', err)
     }
-  };
-  xhr.onerror = errorMsg => error("NETWORK_ERROR", errorMsg);
-  return xhr.send();
-};
-
+  }
+  xhr.onerror = (errorMsg) => error('NETWORK_ERROR', errorMsg)
+  return xhr.send()
+}
 
 /*
 Probably btoa can work incorrect, you can override btoa with next example:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Base64_encoding_and_decoding#Solution_.232_.E2.80.93_rewriting_atob%28%29_and_btoa%28%29_using_TypedArrays_and_UTF-8
 */
-var arrayBufferToBase64ImagePNG = function(buffer: XMLHttpRequest['response']) {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
+var arrayBufferToBase64ImagePNG = function (buffer: XMLHttpRequest['response']) {
+  let binary = ''
+  const bytes = new Uint8Array(buffer)
   for (let i = 0, end = bytes.byteLength, asc = 0 <= end; asc ? i < end : i > end; asc ? i++ : i--) {
-    binary += String.fromCharCode(bytes[i]);
+    binary += String.fromCharCode(bytes[i])
   }
 
-  return 'data:image/png;base64,' + btoa(binary);
-};
+  return 'data:image/png;base64,' + btoa(binary)
+}

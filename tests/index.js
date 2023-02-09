@@ -5855,9 +5855,13 @@
 
   // src/WebSQLDataStorage.ts
   var WebSQLDataStorage = class {
-    constructor(storeName, onReady, onError, storage) {
+    constructor(storeName, onReady, onError) {
       this._storeName = storeName;
-      if (storage === "sqlite" && window["sqlitePlugin"]) {
+      this._webSqlErrorHandler = (onError2) => (_, err) => {
+        onError2(err);
+        return true;
+      };
+      if (window["sqlitePlugin"]) {
         this.initSqlite(onReady, onError);
       } else {
         this._webSQLDB = window.openDatabase("OfflineTileImages", "1.0", "Store tile images for OfflineLeaftMap", 40 * 1024 * 1024);
@@ -5880,7 +5884,8 @@
     }
     get(key, onSuccess, onError) {
       this._webSQLDB.transaction((tx) => {
-        const onSQLSuccess = function(tx2, results) {
+        const sn = this._storeName;
+        const onSQLSuccess = function(_, results) {
           const len = results.rows.length;
           if (len === 0) {
             onSuccess(void 0);
@@ -5890,17 +5895,17 @@
             onError("There should be no more than one entry");
           }
         };
-        tx.executeSql(`SELECT * FROM ${this._storeName} WHERE key='${key}'`, [], onSQLSuccess, onError);
+        tx.executeSql(`SELECT * FROM ${this._storeName} WHERE key='${key}'`, [], onSQLSuccess, this._webSqlErrorHandler(onError));
       });
     }
     clear(onSuccess, onError) {
       this._webSQLDB.transaction((tx) => {
-        tx.executeSql(`DELETE FROM ${this._storeName}`, [], onSuccess, onError);
+        tx.executeSql(`DELETE FROM ${this._storeName}`, [], onSuccess, this._webSqlErrorHandler(onError));
       });
     }
     put(key, object, onSuccess, onError) {
       this._webSQLDB.transaction((tx) => {
-        tx.executeSql(`INSERT OR REPLACE INTO ${this._storeName} VALUES (?, ?)`, [key, object.image], onSuccess, onError);
+        tx.executeSql(`INSERT OR REPLACE INTO ${this._storeName} VALUES (?, ?)`, [key, object.image], onSuccess, this._webSqlErrorHandler(onError));
       });
     }
     getDenseBatch(tileImagesToQueryArray, onSuccess, onError) {
@@ -5917,7 +5922,7 @@
           result.push(void 0);
         }
         const keys = tileImagesToQueryArray2.join(",");
-        const onSQLSuccess = function(tx2, results) {
+        const onSQLSuccess = function(_, results) {
           let asc1, end1;
           for (i = 0, end1 = results.rows.length, asc1 = 0 <= end1; asc1 ? i < end1 : i > end1; asc1 ? i++ : i--) {
             var item = results.rows.item(i);
@@ -5928,7 +5933,7 @@
           }
           onSuccess(result);
         };
-        tx.executeSql(`SELECT * FROM ${this._storeName} WHERE key IN (${keys})`, [], onSQLSuccess, onError);
+        tx.executeSql(`SELECT * FROM ${this._storeName} WHERE key IN (${keys})`, [], onSQLSuccess, this._webSqlErrorHandler(onError));
       });
     }
   };
@@ -5984,7 +5989,7 @@
       if (this._myQueue != null) {
         this._myQueue.kill();
         if (this._nbImagesCurrentlyBeingRetrieved === 0) {
-          this._finish();
+          this._finish(null);
         }
         return true;
       }
@@ -6011,10 +6016,10 @@
       this._eventEmitter.fire("tilecachingprogressdone", null);
       this._myQueue = null;
       this._nbImagesCurrentlyBeingRetrieved = 0;
-      if (error != null) {
-        return onError(error);
+      if (error && error !== null && onError) {
+        onError(error);
       } else {
-        return this._onSaveImagesSuccess();
+        this._onSaveImagesSuccess && this._onSaveImagesSuccess();
       }
     }
     saveImages(tileImagesToQuery, onStarted, onSuccess, onError) {
@@ -6026,27 +6031,27 @@
         throw new Error("This async function needs callbacks");
       }
       this._onSaveImagesSuccess = onSuccess;
-      return this._getImagesNotInDB(
+      this._getImagesNotInDB(
         tileImagesToQuery,
         (tileInfoOfImagesNotInDB) => {
           if (!this._beingCanceled && tileInfoOfImagesNotInDB != null && tileInfoOfImagesNotInDB.length > 0) {
             const MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY = 8;
             this._myQueue = import_async.default.queue(
               (data2, callback) => {
-                return this._saveTile(data2, callback);
+                this._saveTile(data2, callback);
               },
               MAX_NB_IMAGES_RETRIEVED_SIMULTANEOUSLY
             );
             this._myQueue.drain = (error) => {
-              return this._finish(error, onError);
+              this._finish(error, onError);
             };
             for (var data of Array.from(tileInfoOfImagesNotInDB)) {
               this._myQueue.push(data);
             }
-            return onStarted();
+            onStarted();
           } else {
             onStarted();
-            return this._finish();
+            this._finish();
           }
         },
         (error) => onError(error)
@@ -6057,7 +6062,7 @@
       for (var imageKey in tileImagesToQuery) {
         tileImagesToQueryArray.push(imageKey);
       }
-      return this.storage.getDenseBatch(
+      this.storage.getDenseBatch(
         tileImagesToQueryArray,
         (tileImages) => {
           let i = 0;
@@ -6071,43 +6076,43 @@
               this._nbTilesLeftToSave++;
               tileInfoOfImagesNotInDB.push({ key, tileInfo });
             }
-            return i++;
+            i++;
           };
           for (var tileImage of Array.from(tileImages)) {
             testTile(tileImage);
           }
           this._updateTotalNbImagesLeftToSave(this._nbTilesLeftToSave);
-          return callback(tileInfoOfImagesNotInDB);
+          callback(tileInfoOfImagesNotInDB);
         },
         (error) => onError(error)
       );
     }
     _saveTile(data, callback) {
       const gettingImage = (response) => {
-        return this.storage.put(
+        this.storage.put(
           data.key,
           { "image": response },
           () => {
             this._decrementNbTilesLeftToSave();
-            return callback();
+            callback();
           },
           (error) => {
             this._decrementNbTilesLeftToSave();
-            return callback(error);
+            callback(error);
           }
         );
       };
       const errorGettingImage = (errorType, errorData) => {
         this._decrementNbTilesLeftToSave();
         this._eventEmitter._reportError(errorType, { data: errorData, tileInfo: data.tileInfo });
-        return callback(errorType);
+        callback(errorType);
       };
       this._nbImagesCurrentlyBeingRetrieved++;
-      return this._imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage);
+      this._imageRetriever.retrieveImage(data.tileInfo, gettingImage, errorGettingImage);
     }
     _updateTotalNbImagesLeftToSave(nbTiles) {
       this._nbTilesLeftToSave = nbTiles;
-      return this._eventEmitter.fire("tilecachingprogressstart", { nbTiles: this._nbTilesLeftToSave });
+      this._eventEmitter.fire("tilecachingprogressstart", { nbTiles: this._nbTilesLeftToSave });
     }
     _decrementNbTilesLeftToSave() {
       this._nbTilesLeftToSave--;
@@ -6116,7 +6121,7 @@
       }
       this._nbImagesCurrentlyBeingRetrieved--;
       if (this._beingCanceled && this._nbImagesCurrentlyBeingRetrieved === 0) {
-        return this._finish();
+        this._finish();
       }
     }
   };
