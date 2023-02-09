@@ -1,11 +1,5 @@
 .idea/
 node_modules/
-lib/ImageRetriever.js
-lib/ImageStore.js
-lib/OfflineLayer.js
-test/browserified.js
-demo/bundle.js
+tests/index.js
+tests/index.js.map
 dist/index.js
-lib/index.js
-lib/WebSQLDataStorage.js
-lib/
