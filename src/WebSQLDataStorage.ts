@@ -1,4 +1,8 @@
-import {DataStorage, ErrorCallback, SuccessCallback} from './types'
+import {DataStorage, DataStorageErrorCallback, ErrorCallback, SuccessCallback} from './types'
+
+const sqlErrorToError = (err: SQLError) => {
+  return new Error(`SQLError[${err.code}] - ${err.message}`)
+}
 
 class WebSQLDataStorage implements DataStorage {
   private _storeName
@@ -6,11 +10,11 @@ class WebSQLDataStorage implements DataStorage {
 
   private _webSqlErrorHandler: (onError: ErrorCallback) => SQLStatementErrorCallback
 
-  constructor(storeName: string, onReady: () => void, onError: ErrorCallback) {
+  constructor(storeName: string, onReady: () => void, onError: DataStorageErrorCallback) {
     this._storeName = storeName
 
     this._webSqlErrorHandler = (onError: ErrorCallback) => (_: SQLTransaction, err: SQLError) => {
-      onError(err)
+      onError(sqlErrorToError(err))
       return true
     }
 
@@ -27,13 +31,15 @@ class WebSQLDataStorage implements DataStorage {
         (tx) => {
           tx.executeSql(`CREATE TABLE IF NOT EXISTS ${this._storeName} (key unique, image)`)
         },
-        onError,
+        (error: SQLError) => {
+          onError(sqlErrorToError(error))
+        },
         onReady,
       )
     }
   }
 
-  initSqlite(onReady: () => void, onError: ErrorCallback) {
+  initSqlite(onReady: () => void, onError: DataStorageErrorCallback) {
     window['sqlitePlugin'].openDatabase({name: 'OfflineTileImages', location: 'default'}, (sqliteDb: any) => {
       console.log('Database open successful')
       this._webSQLDB = sqliteDb
@@ -41,13 +47,15 @@ class WebSQLDataStorage implements DataStorage {
         (tx) => {
           tx.executeSql(`CREATE TABLE IF NOT EXISTS ${this._storeName} (key unique, image)`)
         },
-        onError,
+        (error: SQLError) => {
+          onError(sqlErrorToError(error))
+        },
         onReady,
       )
     })
   }
 
-  get(key: string, onSuccess: SuccessCallback, onError: ErrorCallback) {
+  get(key: string, onSuccess: SuccessCallback, onError: DataStorageErrorCallback) {
     this._webSQLDB.transaction((tx) => {
       const sn = this._storeName
       const onSQLSuccess = function (_: any, results: any) {
@@ -57,7 +65,7 @@ class WebSQLDataStorage implements DataStorage {
         } else if (len === 1) {
           onSuccess(results.rows.item(0))
         } else {
-          onError('There should be no more than one entry')
+          onError(new Error('There should be no more than one entry'))
         }
       }
 
@@ -70,13 +78,13 @@ class WebSQLDataStorage implements DataStorage {
     })
   }
 
-  clear(onSuccess: SuccessCallback, onError: ErrorCallback) {
+  clear(onSuccess: SuccessCallback, onError: DataStorageErrorCallback) {
     this._webSQLDB.transaction((tx) => {
       tx.executeSql(`DELETE FROM ${this._storeName}`, [], onSuccess, this._webSqlErrorHandler(onError))
     })
   }
 
-  put(key: string, object: any, onSuccess: SuccessCallback, onError: ErrorCallback) {
+  put(key: string, object: any, onSuccess: SuccessCallback, onError: DataStorageErrorCallback) {
     this._webSQLDB.transaction((tx) => {
       tx.executeSql(
         `INSERT OR REPLACE INTO ${this._storeName} VALUES (?, ?)`,
@@ -91,7 +99,7 @@ class WebSQLDataStorage implements DataStorage {
   // IndexedDB has an option called 'dense'. The idea is that the result array matches the queried keys array, both
   // in size and position. If nothing has been found for a key, there will be undefined at that index in the response.
   // Note: For now, getDenseBatch is only used to find the missing keys
-  getDenseBatch(tileImagesToQueryArray: any[], onSuccess: SuccessCallback, onError: ErrorCallback) {
+  getDenseBatch(tileImagesToQueryArray: any[], onSuccess: SuccessCallback, onError: DataStorageErrorCallback) {
     if (tileImagesToQueryArray.length === 0) {
       onSuccess([])
     }

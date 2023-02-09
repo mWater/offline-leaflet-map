@@ -194,10 +194,10 @@ class ImageStore {
       )
     }
 
-    const errorGettingImage = (errorType: string, errorData: Error) => {
+    const errorGettingImage = (errorType: string, errorData: ProgressEvent) => {
       this._decrementNbTilesLeftToSave()
       this._eventEmitter._reportError(errorType, {data: errorData, tileInfo: data.tileInfo})
-      callback(errorType)
+      callback(new Error(`${errorType} - ${JSON.stringify(errorData)}`))
     }
 
     this._nbImagesCurrentlyBeingRetrieved++

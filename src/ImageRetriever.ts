@@ -58,20 +58,20 @@ THE SOFTWARE.
 var ajax = function (
   url: string,
   callback: (res: any) => void,
-  error: (code: string, err: any) => void,
+  error: (code: string, err: ProgressEvent) => void,
   queueCallback?: any,
 ) {
   const xhr = new XMLHttpRequest()
   xhr.open('GET', url, true)
   xhr.responseType = 'arraybuffer'
-  xhr.onload = function (err) {
+  xhr.onload = function (ev) {
     if (this.status === 200) {
       return callback(this.response)
     } else {
-      return error('GET_STATUS_ERROR', err)
+      return error('GET_STATUS_ERROR', ev)
     }
   }
-  xhr.onerror = (errorMsg) => error('NETWORK_ERROR', errorMsg)
+  xhr.onerror = (ev) => error('NETWORK_ERROR', ev)
   return xhr.send()
 }
 

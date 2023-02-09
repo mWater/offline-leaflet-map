@@ -1,11 +1,20 @@
-import { Control } from "leaflet";
+import { Control, Map, LeafletEvent } from 'leaflet';
+import OfflineLayer from './OfflineLayer';
+type ProgressEvent = {
+    nbTiles: number;
+} & LeafletEvent;
 declare class OfflineProgressControl extends Control {
-    onAdd(map: any): HTMLDivElement;
-    onProgressStart(): any;
-    onProgressDone(): any;
-    updateTotalNbTilesLeftToSave(event: any): string | undefined;
-    updateNbTilesLeftToSave(event: any): string | undefined;
-    onCancelClick(): any;
-    setOfflineLayer(offlineLayer: any): any;
+    private _counter;
+    private _cancelButton;
+    private _evaluating;
+    private _nbTilesToSave;
+    private _offlineLayer;
+    onAdd(map: Map): HTMLDivElement;
+    onProgressStart(): void;
+    onProgressDone(): void;
+    updateTotalNbTilesLeftToSave(event: ProgressEvent): void;
+    updateNbTilesLeftToSave(event: ProgressEvent): void;
+    onCancelClick(): void;
+    setOfflineLayer(offlineLayer: OfflineLayer): void;
 }
 export default OfflineProgressControl;

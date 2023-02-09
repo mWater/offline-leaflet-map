@@ -15,7 +15,7 @@ import {ErrorCallback, SuccessCallback} from './types'
 
 type OfflineLayerOptions = {
   onReady: () => void
-  onError: (code: string, message?: Error, message1?: string) => void
+  onError: (code: string, message?: any) => void
   dbOption: string
   storeName?: string
 } & L.TileLayerOptions
@@ -32,7 +32,7 @@ export type TileImageInfo = {
 class OfflineLayer extends L.TileLayer {
   private _alreadyReportedErrorForThisActions: boolean
   private _onReady: () => void
-  private _onError: (code: string, message?: Error, message1?: string) => void
+  private _onError: (code: string, message?: any, message1?: string) => void
   private _tileImagesStore: null | ImageStore
   private _minZoomLevel: number
 
@@ -151,7 +151,7 @@ class OfflineLayer extends L.TileLayer {
     if (this._onError) {
       if (!this._alreadyReportedErrorForThisActions) {
         this._alreadyReportedErrorForThisActions = true
-        return this._onError(errorType, errorData)
+        this._onError(errorType, errorData)
       }
     }
   }
@@ -269,19 +269,19 @@ class OfflineLayer extends L.TileLayer {
 
     if (!this._tileImagesStore) {
       this._reportError('NO_DB', 'No DB available')
-      onError('No DB available')
+      onError(new Error('No DB available'))
       return
     }
 
     if (this.isBusy()) {
       this._reportError('SYSTEM_BUSY', 'system is busy.')
-      onError('system is busy.')
+      onError(new Error('system is busy.'))
       return
     }
 
     if (this._map.getZoom() < this._minZoomLevel) {
       this._reportError('ZOOM_LEVEL_TOO_LOW')
-      onError('ZOOM_LEVEL_TOO_LOW')
+      onError(new Error('ZOOM_LEVEL_TOO_LOW'))
       return
     }
 
