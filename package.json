@@ -23,6 +23,7 @@
     "@types/leaflet": "^1.9.0",
     "@types/lodash": "^4.14.191",
     "browserify": "^10.2.4",
+    "buffer": "^6.0.3",
     "build-library": "github:mWater/build-library",
     "canonical-json": "0.0.4",
     "chai": "^4.3.7",

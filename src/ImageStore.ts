@@ -219,7 +219,7 @@ class ImageStore {
 
     // I need to do this so the ImageStore only call finish when everything is done canceling
     this._nbImagesCurrentlyBeingRetrieved--
-    if (this._beingCanceled && this._nbImagesCurrentlyBeingRetrieved === 0) {
+    if (!this._beingCanceled && this._nbImagesCurrentlyBeingRetrieved === 0) {
       this._finish()
     }
   }

@@ -1,6 +1,7 @@
 class FakeEventEmitter {
-  fire() {
-    return null;
+  fire(...args) {
+    console.log(args)
+    return null
   }
 }
 

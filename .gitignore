@@ -1,5 +1,8 @@
 .idea/
 node_modules/
 tests/index.js
+tests/index.js
+tests/index.html
 tests/index.js.map
-dist/index.js
+dist/index.*
+.parcel-cache/
